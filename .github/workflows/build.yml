@@ -7,9 +7,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
-      - uses: android-actions/setup-android@v3
+      # Android SDK is preinstalled on GitHub runners (ANDROID_HOME); just accept licenses so Gradle can fetch platform 35 if missing.
+      - name: Accept Android licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: "8.9" }
       - run: gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
-        with: { name: sahachor-debug-apk, path: app/build/outputs/apk/debug/*.apk }
+        if: always()
+        with: { name: sahachor-debug-apk, path: app/build/outputs/apk/debug/*.apk, if-no-files-found: ignore }
