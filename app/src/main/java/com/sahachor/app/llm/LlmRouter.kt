@@ -5,8 +5,10 @@ import kotlinx.coroutines.CancellationException
 import org.json.JSONArray
 import org.json.JSONObject
 
+fun interface Chatter { suspend fun chat(system: String?, messages: List<ChatMsg>): Result<String> }
+
 /** Holds the user's providers (encrypted at rest) and falls back to the next one when a provider is rate-limited or down. */
-class LlmRouter(private val store: SecretStore, private val clients: (ProviderType) -> LlmClient = ::clientFor) {
+class LlmRouter(private val store: SecretStore, private val clients: (ProviderType) -> LlmClient = ::clientFor) : Chatter {
     @Volatile private var configs: List<ProviderConfig> = load()
 
     fun providers(): List<ProviderConfig> = configs
@@ -21,7 +23,7 @@ class LlmRouter(private val store: SecretStore, private val clients: (ProviderTy
     @Synchronized
     fun remove(type: ProviderType) { configs = configs.filterNot { it.type == type }; save() }
 
-    suspend fun chat(system: String?, messages: List<ChatMsg>): Result<String> {
+    override suspend fun chat(system: String?, messages: List<ChatMsg>): Result<String> {
         val active = configs.filter { it.valid }
         if (active.isEmpty()) return Result.failure(LlmException(LlmError.NoProvider))
         var last: LlmError = LlmError.NoProvider

@@ -15,6 +15,11 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.sahachor.app.llm.ProviderType
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+private fun fmtTime(ms: Long) = SimpleDateFormat("d MMM, HH:mm", Locale.getDefault()).format(Date(ms))
 
 @Composable
 fun OnboardingScreen(vm: MainViewModel, onDone: () -> Unit) {
@@ -26,10 +31,9 @@ fun OnboardingScreen(vm: MainViewModel, onDone: () -> Unit) {
 
     LaunchedEffect(s.connected) { if (s.connected) onDone() }
 
-    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("AI যুক্ত করুন", style = MaterialTheme.typography.headlineSmall)
         Text("সহচর আপনার নিজের API কী দিয়ে কাজ করে। কীটি শুধু এই ফোনে এনক্রিপ্ট হয়ে থাকে। সবচেয়ে সহজ পথ: Google Gemini (ফ্রি)।")
-
         Text("১. প্রোভাইডার বেছে নিন", style = MaterialTheme.typography.titleSmall)
         ProviderType.values().forEach { p ->
             FilterChip(selected = chosen == p, onClick = { chosen = p }, label = { Text("${p.label} · ${p.note}") })
@@ -37,7 +41,6 @@ fun OnboardingScreen(vm: MainViewModel, onDone: () -> Unit) {
         Text("২. কী তৈরি করুন", style = MaterialTheme.typography.titleSmall)
         Text("নিচের বোতামে ট্যাপ করুন, সাইটে লগইন করে \"Create API key\" চাপুন, তারপর কী-টি কপি করুন।")
         OutlinedButton(onClick = { runCatching { uri.openUri(chosen.keyPageUrl) } }) { Text("${chosen.label}-এর কী পেজ খুলুন") }
-
         Text("৩. এখানে পেস্ট করুন", style = MaterialTheme.typography.titleSmall)
         OutlinedTextField(
             value = text, onValueChange = { text = it }, modifier = Modifier.fillMaxWidth(), singleLine = true,
@@ -61,7 +64,7 @@ fun ChatScreen(vm: MainViewModel, onAddKey: () -> Unit) {
     val listState = rememberLazyListState()
     LaunchedEffect(state.messages.size) { if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.size - 1) }
 
-    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+    Column(Modifier.fillMaxSize().imePadding()) {
         if (!state.hasProvider) {
             Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -69,7 +72,7 @@ fun ChatScreen(vm: MainViewModel, onAddKey: () -> Unit) {
                 }
             }
         }
-        if (!state.dbReady) Text("সতর্কতা: এনক্রিপ্টেড ডেটাবেস খোলা যায়নি, চ্যাট সংরক্ষণ হবে না।", Modifier.padding(12.dp), color = MaterialTheme.colorScheme.error)
+        if (!state.dbReady) Text("সতর্কতা: এনক্রিপ্টেড ডেটাবেস খোলা যায়নি; চ্যাট, কাজ ও স্মৃতি সংরক্ষণ হবে না।", Modifier.padding(12.dp), color = MaterialTheme.colorScheme.error)
         LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp), state = listState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(state.messages) { m ->
                 val mine = m.role == "user"
@@ -81,10 +84,55 @@ fun ChatScreen(vm: MainViewModel, onAddKey: () -> Unit) {
             }
         }
         state.error?.let { Text("${it.message} ${it.fix}", Modifier.padding(12.dp), color = MaterialTheme.colorScheme.error) }
+        state.pending?.let { p ->
+            Card(Modifier.fillMaxWidth().padding(8.dp)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("নিশ্চিত করুন", style = MaterialTheme.typography.titleSmall)
+                    Text(p.summary)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { vm.confirm(true) }) { Text("হ্যাঁ, করুন") }
+                        OutlinedButton(onClick = { vm.confirm(false) }) { Text("বাতিল") }
+                    }
+                }
+            }
+        }
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(value = input, onValueChange = { input = it }, modifier = Modifier.weight(1f), placeholder = { Text("বার্তা লিখুন…") }, maxLines = 4)
             Spacer(Modifier.width(8.dp))
-            Button(enabled = input.isNotBlank() && !state.sending, onClick = { vm.send(input); input = "" }) { Text(if (state.sending) "…" else "পাঠান") }
+            Button(enabled = input.isNotBlank() && !state.sending && state.pending == null, onClick = { vm.send(input); input = "" }) { Text(if (state.sending) "…" else "পাঠান") }
+        }
+    }
+}
+
+@Composable
+fun TasksScreen(vm: MainViewModel) {
+    val tasks by vm.tasks.collectAsState()
+    if (tasks.isEmpty()) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("কোনো কাজ নেই। চ্যাটে বলুন: \"কাল সকাল ৯টায় মনে করিয়ে দাও…\"") }; return }
+    LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        items(tasks, key = { it.id }) { t ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = t.done, onCheckedChange = { vm.toggleTask(t) })
+                Column(Modifier.weight(1f)) {
+                    Text(t.title)
+                    t.dueAt?.let { Text(fmtTime(it), style = MaterialTheme.typography.bodySmall) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MemoryScreen(vm: MainViewModel) {
+    val mem by vm.memories.collectAsState()
+    if (mem.isEmpty()) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("এখনো কিছু মনে রাখা হয়নি। বলুন: \"মনে রেখো, আমি …\"") }; return }
+    LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(mem, key = { it.id }) { m ->
+            Card(Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) { Text("${m.key} (${m.type})", style = MaterialTheme.typography.titleSmall); Text(m.value) }
+                    TextButton(onClick = { vm.deleteMemory(m.id) }) { Text("মুছুন") }
+                }
+            }
         }
     }
 }

@@ -30,12 +30,18 @@ data class Memory(@PrimaryKey(autoGenerate = true) val id: Long = 0, val type: S
 @Dao interface MemoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsert(m: Memory): Long
     @Query("SELECT * FROM memories ORDER BY importance DESC, updatedAt DESC") fun all(): Flow<List<Memory>>
+    @Query("SELECT * FROM memories ORDER BY importance DESC, updatedAt DESC LIMIT :n") suspend fun top(n: Int): List<Memory>
+    @Query("SELECT * FROM memories WHERE `key` LIKE :q OR value LIKE :q ORDER BY importance DESC, updatedAt DESC LIMIT 10") suspend fun search(q: String): List<Memory>
     @Query("DELETE FROM memories WHERE id = :id") suspend fun delete(id: Long)
 }
 
 @Dao interface TaskDao {
     @Insert suspend fun insert(t: TaskItem): Long
     @Update suspend fun update(t: TaskItem)
+    @Query("SELECT * FROM tasks WHERE id = :id") suspend fun byId(id: Long): TaskItem?
+    @Query("DELETE FROM tasks WHERE id = :id") suspend fun delete(id: Long)
+    @Query("SELECT * FROM tasks WHERE done = 0 ORDER BY COALESCE(dueAt, 9223372036854775807) LIMIT 50") suspend fun open(): List<TaskItem>
+    @Query("SELECT * FROM tasks WHERE done = 0 AND dueAt IS NOT NULL AND dueAt > :now") suspend fun upcoming(now: Long): List<TaskItem>
     @Query("SELECT * FROM tasks ORDER BY done, COALESCE(dueAt, 9223372036854775807)") fun all(): Flow<List<TaskItem>>
 }
 
