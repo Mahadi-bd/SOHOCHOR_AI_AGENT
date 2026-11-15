@@ -1,0 +1,94 @@
+package com.sahachor.app.llm
+
+import org.json.JSONArray
+import org.json.JSONObject
+
+interface LlmClient {
+    val type: ProviderType
+    /** Cheap, token-free call that proves the key works and returns usable model ids. */
+    suspend fun listModels(key: String): List<String>
+    suspend fun chat(key: String, model: String, system: String?, messages: List<ChatMsg>): String
+}
+
+private fun JSONObject.arr(name: String): JSONArray = optJSONArray(name) ?: JSONArray()
+private inline fun <T> JSONArray.mapObjects(f: (JSONObject) -> T?): List<T> =
+    (0 until length()).mapNotNull { optJSONObject(it)?.let(f) }
+
+private fun parseFail(): Nothing = throw LlmException(LlmError.Unknown("parse"))
+
+class GeminiClient : LlmClient {
+    override val type = ProviderType.GEMINI
+    private fun h(key: String) = mapOf("x-goog-api-key" to key)
+
+    override suspend fun listModels(key: String): List<String> {
+        val j = JSONObject(Http.execute("${type.baseUrl}/models?pageSize=200", h(key), null))
+        return j.arr("models").mapObjects { m ->
+            val methods = m.arr("supportedGenerationMethods")
+            val ok = (0 until methods.length()).any { methods.optString(it) == "generateContent" }
+            if (ok) m.optString("name").removePrefix("models/").ifBlank { null } else null
+        }
+    }
+
+    override suspend fun chat(key: String, model: String, system: String?, messages: List<ChatMsg>): String {
+        val contents = JSONArray()
+        messages.forEach {
+            contents.put(JSONObject().put("role", if (it.role == "assistant") "model" else "user")
+                .put("parts", JSONArray().put(JSONObject().put("text", it.content))))
+        }
+        val body = JSONObject().put("contents", contents)
+        if (!system.isNullOrBlank()) body.put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
+        val res = JSONObject(Http.execute("${type.baseUrl}/models/$model:generateContent", h(key), body.toString()))
+        val parts = res.arr("candidates").optJSONObject(0)?.optJSONObject("content")?.arr("parts") ?: parseFail()
+        val sb = StringBuilder()
+        for (i in 0 until parts.length()) sb.append(parts.optJSONObject(i)?.optString("text").orEmpty())
+        return sb.toString().ifBlank { parseFail() }
+    }
+}
+
+/** Groq, OpenRouter and OpenAI all speak the same chat-completions dialect. */
+class OpenAiCompatClient(override val type: ProviderType) : LlmClient {
+    private fun h(key: String) = mapOf("Authorization" to "Bearer $key")
+
+    override suspend fun listModels(key: String): List<String> {
+        if (type == ProviderType.OPENROUTER) Http.execute("${type.baseUrl}/auth/key", h(key), null) // /models is public, so verify the key separately
+        val j = JSONObject(Http.execute("${type.baseUrl}/models", h(key), null))
+        return j.arr("data").mapObjects { it.optString("id").ifBlank { null } }
+    }
+
+    override suspend fun chat(key: String, model: String, system: String?, messages: List<ChatMsg>): String {
+        val arr = JSONArray()
+        if (!system.isNullOrBlank()) arr.put(JSONObject().put("role", "system").put("content", system))
+        messages.forEach { arr.put(JSONObject().put("role", it.role).put("content", it.content)) }
+        val body = JSONObject().put("model", model).put("messages", arr)
+        val res = JSONObject(Http.execute("${type.baseUrl}/chat/completions", h(key), body.toString()))
+        return res.arr("choices").optJSONObject(0)?.optJSONObject("message")?.optString("content")?.ifBlank { null } ?: parseFail()
+    }
+}
+
+class AnthropicClient : LlmClient {
+    override val type = ProviderType.ANTHROPIC
+    private fun h(key: String) = mapOf("x-api-key" to key, "anthropic-version" to "2023-06-01")
+
+    override suspend fun listModels(key: String): List<String> {
+        val j = JSONObject(Http.execute("${type.baseUrl}/models?limit=100", h(key), null))
+        return j.arr("data").mapObjects { it.optString("id").ifBlank { null } }
+    }
+
+    override suspend fun chat(key: String, model: String, system: String?, messages: List<ChatMsg>): String {
+        val arr = JSONArray()
+        messages.forEach { arr.put(JSONObject().put("role", it.role).put("content", it.content)) }
+        val body = JSONObject().put("model", model).put("max_tokens", 1024).put("messages", arr)
+        if (!system.isNullOrBlank()) body.put("system", system)
+        val res = JSONObject(Http.execute("${type.baseUrl}/messages", h(key), body.toString()))
+        val blocks = res.arr("content")
+        val sb = StringBuilder()
+        for (i in 0 until blocks.length()) blocks.optJSONObject(i)?.takeIf { it.optString("type") == "text" }?.let { sb.append(it.optString("text")) }
+        return sb.toString().ifBlank { parseFail() }
+    }
+}
+
+fun clientFor(type: ProviderType): LlmClient = when (type) {
+    ProviderType.GEMINI -> GeminiClient()
+    ProviderType.ANTHROPIC -> AnthropicClient()
+    else -> OpenAiCompatClient(type)
+}
