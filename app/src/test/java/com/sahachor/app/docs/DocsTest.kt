@@ -45,7 +45,7 @@ class DocsTest {
     @Test fun columnNamesAndSheetNames() {
         assertEquals("A", XlsxWriter.colName(0)); assertEquals("Z", XlsxWriter.colName(25))
         assertEquals("AA", XlsxWriter.colName(26)); assertEquals("AB", XlsxWriter.colName(27))
-        assertEquals(listOf("a_b", "a_b2"), XlsxWriter.sheetNames(listOf("a/b", "A:B")))
+        assertEquals(listOf("a_b", "A_B2"), XlsxWriter.sheetNames(listOf("a/b", "A:B"))) // names are unique ignoring case, as Excel requires
     }
 
     @Test fun specRejectsEmptyContent() {
