@@ -2,17 +2,26 @@ package com.sahachor.app.llm
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Dns
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.net.Inet6Address
+import javax.net.ssl.SSLException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
 internal object Http {
+    /** Many ISPs have a broken IPv6 path; trying IPv4 addresses first avoids long timeouts there. */
+    private val ipv4First = object : Dns {
+        override fun lookup(hostname: String): List<java.net.InetAddress> = Dns.SYSTEM.lookup(hostname).sortedBy { it is Inet6Address }
+    }
+
     val client: OkHttpClient = OkHttpClient.Builder()
+        .dns(ipv4First)
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .callTimeout(75, TimeUnit.SECONDS)
@@ -33,11 +42,13 @@ internal object Http {
         } catch (e: LlmException) {
             throw e
         } catch (e: UnknownHostException) {
-            throw LlmException(LlmError.Offline)
+            throw LlmException(LlmError.Offline("DNS"))
         } catch (e: SocketTimeoutException) {
-            throw LlmException(LlmError.Offline)
+            throw LlmException(LlmError.Offline("TIMEOUT"))
+        } catch (e: SSLException) {
+            throw LlmException(LlmError.Offline("SSL"))
         } catch (e: IOException) {
-            throw LlmException(LlmError.Offline)
+            throw LlmException(LlmError.Offline("IO:" + e.javaClass.simpleName))
         } catch (e: Exception) {
             throw LlmException(LlmError.Unknown(e.javaClass.simpleName))
         }
@@ -46,6 +57,7 @@ internal object Http {
     fun classify(code: Int, body: String): LlmError {
         val low = body.lowercase()
         return when {
+            code == 400 && "location is not supported" in low -> LlmError.Region
             code == 401 || code == 403 -> LlmError.InvalidKey
             code == 400 && ("api key" in low || "api_key" in low || "invalid_api" in low) -> LlmError.InvalidKey
             code == 402 || "insufficient_quota" in low || "credit balance" in low -> LlmError.NoCredit

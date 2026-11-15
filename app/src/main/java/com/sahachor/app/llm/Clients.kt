@@ -77,7 +77,7 @@ class AnthropicClient : LlmClient {
     override suspend fun chat(key: String, model: String, system: String?, messages: List<ChatMsg>): String {
         val arr = JSONArray()
         messages.forEach { arr.put(JSONObject().put("role", it.role).put("content", it.content)) }
-        val body = JSONObject().put("model", model).put("max_tokens", 1024).put("messages", arr)
+        val body = JSONObject().put("model", model).put("max_tokens", 4096).put("messages", arr)
         if (!system.isNullOrBlank()) body.put("system", system)
         val res = JSONObject(Http.execute("${type.baseUrl}/messages", h(key), body.toString()))
         val blocks = res.arr("content")

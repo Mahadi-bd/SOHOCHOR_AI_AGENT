@@ -16,7 +16,7 @@ class LlmRouter(private val store: SecretStore, private val clients: (ProviderTy
 
     @Synchronized
     fun add(cfg: ProviderConfig) {
-        configs = listOf(cfg) + configs.filterNot { it.type == cfg.type } // newest first
+        configs = listOf(cfg) + configs.filterNot { it.type == cfg.type && it.apiKey == cfg.apiKey } // newest first; several keys per provider rotate on rate-limit
         save()
     }
 

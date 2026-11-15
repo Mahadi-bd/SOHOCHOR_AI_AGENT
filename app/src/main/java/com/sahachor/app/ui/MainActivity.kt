@@ -39,13 +39,14 @@ class MainActivity : ComponentActivity() {
                         Box(Modifier.weight(1f)) {
                             if (onboarding) OnboardingScreen(vm) { onboarding = false }
                             else when (tab) {
-                                0 -> ChatScreen(vm) { onboarding = true }
+                                0 -> ChatScreen(vm) { vm.resetSetup(); onboarding = true }
                                 1 -> TasksScreen(vm)
+                                2 -> DocumentsScreen(vm)
                                 else -> MemoryScreen(vm)
                             }
                         }
                         if (!onboarding) NavigationBar(windowInsets = WindowInsets(0, 0, 0, 0)) {
-                            listOf("💬" to "চ্যাট", "✅" to "কাজ", "🧠" to "স্মৃতি").forEachIndexed { i, (icon, label) ->
+                            listOf("💬" to "চ্যাট", "✅" to "কাজ", "📄" to "ডকুমেন্ট", "🧠" to "স্মৃতি").forEachIndexed { i, (icon, label) ->
                                 NavigationBarItem(selected = tab == i, onClick = { tab = i }, icon = { Text(icon) }, label = { Text(label) })
                             }
                         }

@@ -3,6 +3,7 @@ package com.sahachor.app
 import android.app.Application
 import com.sahachor.app.core.SecretStore
 import com.sahachor.app.data.AppDatabase
+import com.sahachor.app.docs.DocumentStore
 import com.sahachor.app.llm.KeySetup
 import com.sahachor.app.llm.LlmRouter
 import com.sahachor.app.reminders.Notifier
@@ -21,6 +22,7 @@ class SahachorApp : Application() {
     /** The encrypted DB opens in the background (SQLCipher key derivation is slow); null means it could not be opened. */
     lateinit var dbDeferred: Deferred<AppDatabase?>; private set
     val keySetup = KeySetup()
+    val documents by lazy { DocumentStore(this) }
 
     override fun onCreate() {
         super.onCreate()

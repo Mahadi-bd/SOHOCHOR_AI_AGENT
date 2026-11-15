@@ -10,6 +10,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -65,11 +67,10 @@ fun ChatScreen(vm: MainViewModel, onAddKey: () -> Unit) {
     LaunchedEffect(state.messages.size) { if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.size - 1) }
 
     Column(Modifier.fillMaxSize().imePadding()) {
-        if (!state.hasProvider) {
-            Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("AI যুক্ত নেই", Modifier.weight(1f)); TextButton(onClick = onAddKey) { Text("কী যোগ করুন") }
-                }
+        Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (state.hasProvider) "AI সংযুক্ত (${state.keys}টি কী) · /help" else "AI যুক্ত নেই", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = onAddKey) { Text(if (state.hasProvider) "কী যোগ" else "কী যোগ করুন") }
             }
         }
         if (!state.dbReady) Text("সতর্কতা: এনক্রিপ্টেড ডেটাবেস খোলা যায়নি; চ্যাট, কাজ ও স্মৃতি সংরক্ষণ হবে না।", Modifier.padding(12.dp), color = MaterialTheme.colorScheme.error)
@@ -131,6 +132,47 @@ fun MemoryScreen(vm: MainViewModel) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) { Text("${m.key} (${m.type})", style = MaterialTheme.typography.titleSmall); Text(m.value) }
                     TextButton(onClick = { vm.deleteMemory(m.id) }) { Text("মুছুন") }
+                }
+            }
+        }
+    }
+}
+
+private fun mimeOf(name: String) = when (name.substringAfterLast('.').lowercase()) {
+    "pdf" -> "application/pdf"
+    "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    else -> "*/*"
+}
+
+@Composable
+fun DocumentsScreen(vm: MainViewModel) {
+    val docs by vm.documents.collectAsState()
+    val ctx = LocalContext.current
+    LaunchedEffect(Unit) { vm.refreshDocuments() }
+    if (docs.isEmpty()) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("কোনো ফাইল নেই। চ্যাটে বলুন: \"/meeting …\" বা \"এই তথ্যগুলো দিয়ে একটা PDF বানাও\"") }; return }
+    LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(docs, key = { it.name }) { d ->
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp)) {
+                    Text(d.name, style = MaterialTheme.typography.titleSmall)
+                    Text("${d.sizeKb} KB · ${fmtTime(d.modified)}", style = MaterialTheme.typography.bodySmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = {
+                            vm.uriFor(d.name)?.let { uri ->
+                                runCatching {
+                                    ctx.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, mimeOf(d.name)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                                }
+                            }
+                        }) { Text("খুলুন") }
+                        TextButton(onClick = {
+                            vm.uriFor(d.name)?.let { uri ->
+                                val send = Intent(Intent.ACTION_SEND).setType(mimeOf(d.name)).putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                runCatching { ctx.startActivity(Intent.createChooser(send, "শেয়ার করুন")) }
+                            }
+                        }) { Text("শেয়ার") }
+                        TextButton(onClick = { vm.deleteDocument(d.name) }) { Text("মুছুন") }
+                    }
                 }
             }
         }

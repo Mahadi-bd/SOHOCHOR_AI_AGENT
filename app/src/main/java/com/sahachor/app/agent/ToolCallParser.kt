@@ -27,6 +27,12 @@ object ToolCallParser {
         return null
     }
 
+    /** True when the model clearly tried a tool call but the JSON is malformed (so we can ask it to resend). */
+    fun looksLikeBrokenCall(text: String): Boolean {
+        val t = text.trimStart().removePrefix("```json").removePrefix("```").trimStart()
+        return t.startsWith("{") && t.contains("\"tool\"")
+    }
+
     private fun matchEnd(s: String, start: Int): Int {
         var depth = 0; var inStr = false; var esc = false
         for (k in start until s.length) {
