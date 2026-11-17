@@ -75,9 +75,9 @@ object DocxWriter {
         val drawing = if (logo != null) {
             val h = 457200L
             val w = h * logo.width / logo.height
-            """<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="$w" cy="$h"/><wp:docPr id="1" name="LIFE EASY logo" descr="LIFE EASY"/><a:graphic xmlns:a="$A"><a:graphicData uri="$PIC"><pic:pic xmlns:pic="$PIC"><pic:nvPicPr><pic:cNvPr id="0" name="logo.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="$w" cy="$h"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>"""
+            """<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="$w" cy="$h"/><wp:docPr id="1" name="LIFE EASY logo" descr="LIFE EASY"/><a:graphic xmlns:a="$A"><a:graphicData uri="$PIC"><pic:pic xmlns:pic="$PIC"><pic:nvPicPr><pic:cNvPr id="0" name="LIFE EASY logo"/><pic:cNvPicPr/><pic:nvPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="$w" cy="$h"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>"""
         } else ""
-        return """<w:p><w:pPr><w:spacing w:after="120"/></w:pPr>$drawing<w:r><w:rPr><w:b/><w:bCs/><w:color w:val="${pal.primary}"/><w:spacing w:val="40"/><w:sz w:val="26"/><w:szCs w:val="26"/></w:rPr><w:t xml:space="preserve">  ${Branding.NAME}</w:t></w:r></w:p>"""
+        return """<w:p><w:pPr><w:spacing w:after="120"/></w:pPr>$drawing<w:r><w:rPr><w:b/><w:bCs/><w:color w:val="${pal.primary}"/><w:spacing w:val="40"/><w:sz w:val="26"/><w:szCs w:val="26"/></w:rPr><w:t xml:space="preserve">${xmlEscape("LIFE EASY")}</w:t></w:r></w:p>"""
     }
 
     private fun run(text: String, rpr: String = ""): String {
@@ -92,7 +92,7 @@ object DocxWriter {
 
     private fun bullet(text: String, pal: Pal): String =
         "<w:p><w:pPr><w:ind w:left=\"567\" w:hanging=\"283\"/></w:pPr>" +
-            run("•", "<w:b/><w:bCs/><w:color w:val=\"${pal.primary}\"/>") + run("  $text") + "</w:p>"
+            run("• $text", "<w:b/><w:bCs/><w:color w:val=\"${pal.primary}\"/>") + "</w:p>"
 
     private fun cell(text: String, width: Int, head: Boolean, zebra: Boolean, pal: Pal): String {
         val fill = if (head) pal.primary else if (zebra) pal.light else null
@@ -106,7 +106,7 @@ object DocxWriter {
         val w = 9026 / n
         val grid = (0 until n).joinToString("") { "<w:gridCol w:w=\"$w\"/>" }
         fun b(side: String) = "<w:$side w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"BFBFBF\"/>"
-        val sb = StringBuilder("<w:tbl><w:tblPr><w:tblW w:w=\"${w * n}\" w:type=\"dxa\"/><w:tblBorders>${b("top")}${b("left")}${b("bottom")}${b("right")}${b("insideH")}${b("insideV")}</w:tblBorders><w:tblLayout w:type=\"fixed\"/><w:tblCellMar><w:left w:w=\"100\" w:type=\"dxa\"/><w:right w:w=\"100\" w:type=\"dxa\"/></w:tblCellMar></w:tblPr><w:tblGrid>$grid</w:tblGrid>")
+        val sb = StringBuilder("<w:tbl><w:tblPr><w:tblW w:w=\"${w * n}\" w:type=\"dxa\"/><w:tblBorders>${b("top")}${b("left")}${b("bottom")}${b("right")}${b("insideH")}${b("insideV")}</w:tblBorders><w:tblLook w:val=\"04A0\"/></w:tblPr><w:tblGrid>$grid</w:tblGrid>")
         rows.forEachIndexed { i, r ->
             val cells = (0 until n).joinToString("") { j -> cell(r.getOrElse(j) { "" }, w, i == 0, i % 2 == 0 && i > 0, pal) }
             val trpr = if (i == 0) "<w:trPr><w:cantSplit/><w:tblHeader/></w:trPr>" else "<w:trPr><w:cantSplit/></w:trPr>"
@@ -129,10 +129,7 @@ object DocxWriter {
     }
 
     private fun styles(pal: Pal): String =
-        XML + "<w:styles xmlns:w=\"$W\"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii=\"Calibri\" w:hAnsi=\"Calibri\" w:cs=\"Nirmala UI\"/><w:color w:val=\"1F2937\"/><w:sz w:val=\"22\"/><w:szCs w:val=\"22\"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after=\"120\" w:line=\"288\" w:lineRule=\"auto\"/></w:pPr></w:pPrDefault></w:docDefaults>" +
-            "<w:style w:type=\"paragraph\" w:default=\"1\" w:styleId=\"Normal\"><w:name w:val=\"Normal\"/></w:style>" +
-            "<w:style w:type=\"paragraph\" w:styleId=\"Title\"><w:name w:val=\"Title\"/><w:basedOn w:val=\"Normal\"/><w:pPr><w:pBdr><w:bottom w:val=\"single\" w:sz=\"18\" w:space=\"6\" w:color=\"${pal.primary}\"/></w:pBdr><w:spacing w:after=\"280\"/></w:pPr><w:rPr><w:b/><w:bCs/><w:color w:val=\"${pal.primary}\"/><w:sz w:val=\"52\"/><w:szCs w:val=\"52\"/></w:rPr></w:style>" +
-            "<w:style w:type=\"paragraph\" w:styleId=\"Heading1\"><w:name w:val=\"heading 1\"/><w:basedOn w:val=\"Normal\"/><w:pPr><w:keepNext/><w:spacing w:before=\"300\" w:after=\"100\"/><w:outlineLvl w:val=\"0\"/></w:pPr><w:rPr><w:b/><w:bCs/><w:color w:val=\"${pal.primary}\"/><w:sz w:val=\"32\"/><w:szCs w:val=\"32\"/></w:rPr></w:style></w:styles>"
+        XML + "<w:styles xmlns:w=\"$W\"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii=\"Calibri\" w:hAnsi=\"Calibri\" w:cs=\"Nirmala UI\"/><w:color w:val=\"1F2937\"/><w:sz w:val=\"22\"/><w:szCs w:val=\"22\"/></w:rPr></w:rPrDefault></w:docDefaults><w:styles><w:style w:type=\"paragraph\" w:default=\"1\" w:styleId=\"Normal\"><w:name w:val=\"Normal\"/></w:style><w:style w:type=\"paragraph\" w:styleId=\"Title\"><w:name w:val=\"Title\"/><w:basedOn w:val=\"Normal\"/><w:pPr><w:spacing w:before=\"240\" w:after=\"160\"/><w:jc w:val=\"left\"/></w:pPr><w:rPr><w:b/><w:bCs/><w:color w:val=\"${pal.primary}\"/><w:sz w:val=\"32\"/><w:szCs w:val=\"32\"/></w:rPr></w:style><w:style w:type=\"paragraph\" w:styleId=\"Heading1\"><w:name w:val=\"heading 1\"/><w:basedOn w:val=\"Normal\"/><w:pPr><w:spacing w:before=\"260\" w:after=\"120\"/><w:outlineLvl w:val=\"0\"/></w:pPr><w:rPr><w:b/><w:bCs/><w:color w:val=\"${pal.primary}\"/><w:sz w:val=\"28\"/><w:szCs w:val=\"28\"/></w:rPr></w:style></w:styles></w:styles>"
 }
 
 object XlsxWriter {
@@ -177,12 +174,7 @@ object XlsxWriter {
     }
 
     private fun styles(pal: Pal): String =
-        XML + "<styleSheet xmlns=\"$S\"><fonts count=\"2\"><font><sz val=\"11\"/><name val=\"Calibri\"/></font><font><b/><sz val=\"11\"/><color rgb=\"FFFFFFFF\"/><name val=\"Calibri\"/></font></fonts>" +
-            "<fills count=\"4\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"gray125\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF${pal.primary}\"/><bgColor indexed=\"64\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF${pal.light}\"/><bgColor indexed=\"64\"/></patternFill></fill></fills>" +
-            "<borders count=\"2\"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style=\"thin\"><color rgb=\"FFD1D5DB\"/></left><right style=\"thin\"><color rgb=\"FFD1D5DB\"/></right><top style=\"thin\"><color rgb=\"FFD1D5DB\"/></top><bottom style=\"thin\"><color rgb=\"FFD1D5DB\"/></bottom><diagonal/></border></borders>" +
-            "<cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs>" +
-            "<cellXfs count=\"3\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyBorder=\"1\"/><xf numFmtId=\"0\" fontId=\"1\" fillId=\"2\" borderId=\"1\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\" applyBorder=\"1\" applyAlignment=\"1\"><alignment vertical=\"center\" wrapText=\"1\"/></xf><xf numFmtId=\"0\" fontId=\"0\" fillId=\"3\" borderId=\"1\" xfId=\"0\" applyFill=\"1\" applyBorder=\"1\"/></cellXfs>" +
-            "<cellStyles count=\"1\"><cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/></cellStyles></styleSheet>"
+        XML + "<styleSheet xmlns=\"$S\"><fonts count=\"2\"><font><sz val=\"11\"/><name val=\"Calibri\"/></font><font><b/><sz val=\"11\"/><color rgb=\"FFFFFFFF\"/><name val=\"Calibri\"/></font></fonts><fills count=\"2\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF${pal.primary}\"/></patternFill></fill></fills><borders count=\"1\"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs><cellXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/></cellXfs><cellStyles count=\"1\"><cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/></cellStyles></styleSheet>"
 
     private fun sheet(sh: Sheet): String {
         val widths = mutableListOf<Int>()
@@ -191,7 +183,7 @@ object XlsxWriter {
             if (j >= widths.size) widths += l else widths[j] = maxOf(widths[j], l)
         }
         val cols = widths.mapIndexed { j, w -> "<col min=\"${j + 1}\" max=\"${j + 1}\" width=\"$w\" customWidth=\"1\"/>" }.joinToString("")
-        val sb = StringBuilder(XML + "<worksheet xmlns=\"$S\"><sheetViews><sheetView workbookViewId=\"0\"><pane ySplit=\"1\" topLeftCell=\"A2\" activePane=\"bottomLeft\" state=\"frozen\"/></sheetView></sheetViews><cols>$cols</cols><sheetData>")
+        val sb = StringBuilder(XML + "<worksheet xmlns=\"$S\"><sheetViews><sheetView workbookViewId=\"0\"><pane ySplit=\"1\" topLeftCell=\"A2\" activePane=\"bottomLeft\" state=\"frozen\"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight=\"15\"/><cols>$cols</cols><sheetData>")
         sh.rows.forEachIndexed { r, row ->
             sb.append("<row r=\"${r + 1}\">")
             row.forEachIndexed { c, v ->
