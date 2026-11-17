@@ -68,8 +68,8 @@ object SpecParser {
             val t = s.optString("title").trim()
             if (t.isEmpty()) continue
             val b = s.optJSONArray("bullets")
-            val bullets = if (b == null) emptyList() else (0 until b.length()).map { b.optString(it).trim().take(200) }.filter { it.isNotEmpty() }
-            val chunks = if (bullets.isEmpty()) listOf(emptyList()) else bullets.chunked(MAX_BULLETS)
+            val bullets: List<String> = if (b == null) emptyList() else (0 until b.length()).map { b.optString(it).trim().take(200) }.filter { it.isNotEmpty() }
+            val chunks: List<List<String>> = if (bullets.isEmpty()) listOf(emptyList<String>()) else bullets.chunked(MAX_BULLETS)
             chunks.forEachIndexed { k, part -> slides += Slide(if (k == 0) t.take(100) else "${t.take(90)} (${k + 1})", part) }
             if (slides.size >= MAX_SLIDES) break
         }

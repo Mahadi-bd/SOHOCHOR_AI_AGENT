@@ -43,34 +43,46 @@ class CreateDocumentTool(private val store: DocumentStore) : Tool {
                 when (fmt) {
                     "pdf", "docx", "odt" -> {
                         val spec = doc
-                        if (spec == null) problems += "$fmt: missing content, sections must be [{heading, body, bullets, table}]"
-                        else created += store.write(fmt, SpecParser.fileBase(spec.title)) { out ->
-                            when (fmt) {
-                                "pdf" -> PdfWriter.write(spec, out, logo)
-                                "docx" -> out.write(DocxWriter.build(spec, logo))
-                                else -> out.write(OdtWriter.build(spec, logo))
+                        if (spec == null) {
+                            problems += "$fmt: missing content, sections must be [{heading, body, bullets, table}]"
+                        } else {
+                            val f = store.write(fmt, SpecParser.fileBase(spec.title)) { out ->
+                                when (fmt) {
+                                    "pdf" -> PdfWriter.write(spec, out, logo)
+                                    "docx" -> out.write(DocxWriter.build(spec, logo))
+                                    else -> out.write(OdtWriter.build(spec, logo))
+                                }
                             }
-                        }.name
+                            created += f.name
+                        }
                     }
                     "xlsx", "ods", "csv" -> {
                         val spec = sheets
-                        if (spec == null) problems += "$fmt: missing content, sheets must be [{name, rows:[[...]]}]"
-                        else created += store.write(fmt, SpecParser.fileBase(spec.title)) { out ->
-                            when (fmt) {
-                                "xlsx" -> out.write(XlsxWriter.build(spec))
-                                "ods" -> out.write(OdsWriter.build(spec))
-                                else -> {
-                                    val want = args.optString("sheet").trim()
-                                    val sheet = spec.sheets.firstOrNull { it.name.equals(want, ignoreCase = true) } ?: spec.sheets.first()
-                                    out.write(CsvWriter.build(sheet.rows))
+                        if (spec == null) {
+                            problems += "$fmt: missing content, sheets must be [{name, rows:[[...]]}]"
+                        } else {
+                            val f = store.write(fmt, SpecParser.fileBase(spec.title)) { out ->
+                                when (fmt) {
+                                    "xlsx" -> out.write(XlsxWriter.build(spec))
+                                    "ods" -> out.write(OdsWriter.build(spec))
+                                    else -> {
+                                        val want = args.optString("sheet").trim()
+                                        val sheet = spec.sheets.firstOrNull { it.name.equals(want, ignoreCase = true) } ?: spec.sheets.first()
+                                        out.write(CsvWriter.build(sheet.rows))
+                                    }
                                 }
                             }
-                        }.name
+                            created += f.name
+                        }
                     }
                     "pptx" -> {
                         val spec = deck
-                        if (spec == null) problems += "pptx: missing content, slides must be [{title, bullets:[...]}]"
-                        else created += store.write("pptx", SpecParser.fileBase(spec.title)) { out -> out.write(PptxWriter.build(spec, logo)) }.name
+                        if (spec == null) {
+                            problems += "pptx: missing content, slides must be [{title, bullets:[...]}]"
+                        } else {
+                            val f = store.write("pptx", SpecParser.fileBase(spec.title)) { out -> out.write(PptxWriter.build(spec, logo)) }
+                            created += f.name
+                        }
                     }
                     else -> problems += "$fmt: unsupported, use ${Formats.all.joinToString()}"
                 }

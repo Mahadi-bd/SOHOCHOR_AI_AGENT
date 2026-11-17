@@ -193,7 +193,7 @@ class DocsTest {
         val spec = SpecParser.doc(JSONObject("""{"title":"রিপোর্ট","sections":[{"heading":"ক","body":"খ"}]}"""))!!
         val logo = Logo.parse(tinyPng)
         val files = unzip(DocxWriter.build(spec.copy(branded = true), logo))
-        files.values.forEach { assertWellFormed(it) }
+        files.filterKeys { it.endsWith(".xml") || it.endsWith(".rels") }.values.forEach { assertWellFormed(it) }
         assertTrue(files.containsKey("word/media/logo.png"))
         val doc = String(files["word/document.xml"]!!, Charsets.UTF_8)
         assertTrue(doc.contains("LIFE EASY") && doc.contains("r:embed=\"rId2\""))
@@ -206,7 +206,7 @@ class DocsTest {
     @Test fun pptxCarriesLogoOnTitleAndContentSlides() {
         val deck = SpecParser.deck(JSONObject("""{"title":"প্রস্তাব","slides":[{"title":"ক","bullets":["খ"]}]}"""))!!
         val files = unzip(PptxWriter.build(deck.copy(branded = true), Logo.parse(tinyPng)))
-        files.values.forEach { assertWellFormed(it) }
+        files.filterKeys { it.endsWith(".xml") || it.endsWith(".rels") }.values.forEach { assertWellFormed(it) }
         assertTrue(files.containsKey("ppt/media/logo.png"))
         for (n in 1..2) {
             assertTrue(String(files["ppt/slides/slide$n.xml"]!!, Charsets.UTF_8).contains("LIFE EASY"))
