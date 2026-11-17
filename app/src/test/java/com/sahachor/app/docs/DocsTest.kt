@@ -29,7 +29,8 @@ class DocsTest {
         val doc = String(files["word/document.xml"]!!, Charsets.UTF_8)
         assertTrue(doc.contains("মিটিং &amp; পরিকল্পনা"))
         assertTrue(doc.contains("দ্বিতীয় &lt;লাইন&gt;"))
-        assertTrue(doc.contains("• এক"))
+        // the bullet dot is its own coloured run, followed by the text
+        assertTrue(doc.contains(">•</w:t>") && doc.contains("  এক</w:t>"))
     }
 
     @Test fun xlsxHandlesNumbersTextAndFormulas() {
