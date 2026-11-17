@@ -1,0 +1,4 @@
+-keep class net.zetetic.database.** { *; }
+-keep class androidx.sqlite.** { *; }
+-dontwarn okhttp3.internal.platform.**
+-dontwarn org.conscrypt.**
