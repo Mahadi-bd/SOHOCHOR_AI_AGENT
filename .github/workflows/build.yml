@@ -14,13 +14,29 @@ jobs:
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: "8.9" }
-      - run: gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace
+      - name: Build and test
+        shell: bash
+        run: gradle :app:testDebugUnitTest :app:assembleDebug --console=plain --stacktrace 2>&1 | tee build.log
+      # When something fails, the real error lines are copied to the top of the run page (Summary tab), so nobody has to scroll the long log.
+      - name: Show errors in summary
+        if: failure()
+        shell: bash
+        run: |
+          {
+            echo '## Build errors (copy this box)'
+            echo '```'
+            grep -E '^e: |^w: .*error|FAILED|AssertionError|What went wrong|Execution failed|Caused by: org.junit|expected:' build.log | grep -v -E '^\s+at ' | head -40
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: sahachor-debug-apk, path: app/build/outputs/apk/debug/*.apk, if-no-files-found: ignore }
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: test-reports, path: app/build/reports/tests, if-no-files-found: ignore }
       # A GitHub Release per push lets an updater app (Obtainium) install new builds on the phone automatically.
       - name: Publish release
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && success()
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
