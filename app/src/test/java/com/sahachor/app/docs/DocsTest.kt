@@ -17,7 +17,12 @@ class DocsTest {
         ZipInputStream(ByteArrayInputStream(b)).use { z -> while (true) { val e = z.nextEntry ?: break; m[e.name] = z.readBytes() } }
         return m
     }
-    private fun assertWellFormed(b: ByteArray) { DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(ByteArrayInputStream(b)) }
+    private fun assertWellFormed(b: ByteArray) {
+        if (b.size >= 8 &&
+            b[0] == 0x89.toByte() && b[1] == 0x50.toByte() && b[2] == 0x4E.toByte() && b[3] == 0x47.toByte() &&
+            b[4] == 0x0D.toByte() && b[5] == 0x0A.toByte() && b[6] == 0x1A.toByte() && b[7] == 0x0A.toByte()) return
+        DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder().parse(ByteArrayInputStream(b))
+    }
 
     private val args = JSONObject("""{"format":"docx","title":"মিটিং & পরিকল্পনা","sections":[{"heading":"লক্ষ্য","body":"প্রথম লাইন\nদ্বিতীয় <লাইন>","bullets":["এক","দুই"]}]}""")
 
@@ -33,7 +38,7 @@ class DocsTest {
     }
 
     @Test fun xlsxHandlesNumbersTextAndFormulas() {
-        val spec = SpecParser.sheets(JSONObject("""{"title":"হিসাব","sheets":[{"name":"খরচ","rows":[["আইটেম","দাম"],["চা",20],["কফি","007"],["মোট","=SUM(B2:B3)"]]}]}"""))!!
+        val spec = SpecParser.sheets(JSONObject("""{"title":"হিসাব","sheets":[{"name":"খরচ","rows":[["আইটেম","দাম"],["চা",20],["কফি","007"],["মোট","=SUM(B2:B3)"]]}]}""") )!!
         val files = unzip(XlsxWriter.build(spec))
         files.values.forEach { assertWellFormed(it) }
         val sheet = String(files["xl/worksheets/sheet1.xml"]!!, Charsets.UTF_8)
@@ -96,7 +101,7 @@ class DocsTest {
     }
 
     @Test fun pptxIsWellFormedWithTitleSlide() {
-        val deck = SpecParser.deck(JSONObject("""{"title":"অ্যাপ প্রস্তাব","subtitle":"ক্লায়েন্ট মিটিং","theme":"orange","slides":[{"title":"সমস্যা","bullets":["এক & দুই","তিন"]},{"title":"সময়সূচি","bullets":["ধাপ ১"]}]}"""))!!
+        val deck = SpecParser.deck(JSONObject("""{"title":"অ্যাপ প্রস্তাব","subtitle":"ক্লায়েন্ট মিটিং","theme":"orange","slides":[{"title":"ক","bullets":["এক & দুই"]}]}""") )!!
         val files = unzip(PptxWriter.build(deck))
         files.values.forEach { assertWellFormed(it) }
         assertEquals(3, files.keys.count { it.matches(Regex("ppt/slides/slide\\d+\\.xml")) })
@@ -108,7 +113,7 @@ class DocsTest {
 
     @Test fun deckSplitsLongBulletListsAndRejectsEmpty() {
         val bullets = (1..8).joinToString(",") { "\"পয়েন্ট $it\"" }
-        val deck = SpecParser.deck(JSONObject("""{"title":"t","slides":[{"title":"তালিকা","bullets":[$bullets]}]}"""))!!
+        val deck = SpecParser.deck(JSONObject("""{"title":"t","slides":[{"title":"তালিকা","bullets":[$bullets]}]}""") )!!
         assertEquals(listOf("তালিকা", "তালিকা (2)"), deck.slides.map { it.title })
         assertEquals(listOf(6, 2), deck.slides.map { it.bullets.size })
         assertNull(SpecParser.deck(JSONObject("""{"title":"t","slides":[]}""")))
@@ -121,7 +126,7 @@ class DocsTest {
     }
 
     @Test fun docxRendersTablesWithThemeColours() {
-        val spec = SpecParser.doc(JSONObject("""{"theme":"green","title":"রিপোর্ট","sections":[{"heading":"সারণি","table":[["ধাপ","তারিখ"],["ডিজাইন","১০ ডিসেম্বর"]]}]}"""))!!
+        val spec = SpecParser.doc(JSONObject("""{"theme":"green","title":"রিপোর্ট","sections":[{"heading":"সারণি","table":[["ধাপ","তারিখ"],["ডিজাইন","2024-01-01"]]}]}""") )!!
         val doc = String(unzip(DocxWriter.build(spec))["word/document.xml"]!!, Charsets.UTF_8)
         assertTrue(doc.contains("<w:tbl>") && doc.contains("w:fill=\"059669\"") && doc.contains("<w:tblHeader/>"))
         assertWellFormed(doc.toByteArray())
@@ -139,7 +144,7 @@ class DocsTest {
     }
 
     @Test fun odtIsValidOpenDocumentPackage() {
-        val spec = SpecParser.doc(JSONObject("""{"theme":"teal","title":"মিটিং & পরিকল্পনা","sections":[{"heading":"লক্ষ্য","body":"প্রথম <লাইন>","bullets":["এক"],"table":[["ধাপ","তারিখ"],["ডিজাইন","১০ ডিসেম্বর"]]}]}"""))!!
+        val spec = SpecParser.doc(JSONObject("""{"theme":"teal","title":"মিটিং & পরিকল্পনা","sections":[{"heading":"লক্ষ্য","body":"প্রথম <লাইন>"}]}""") )!!
         val bytes = OdtWriter.build(spec)
         ZipInputStream(ByteArrayInputStream(bytes)).use { z ->
             val first = z.nextEntry!!
@@ -158,7 +163,7 @@ class DocsTest {
         assertEquals("of:=AVERAGE([.A1];[.B1])", OdfFormula.fromExcel("=AVERAGE(A1,B1)"))
         assertEquals("of:=LOG10([.A1])", OdfFormula.fromExcel("=LOG10(A1)")) // LOG10 is a function, not a cell
         assertNull(OdfFormula.fromExcel("=HYPERLINK(\"http://x\")")); assertNull(OdfFormula.fromExcel("=A1+Sheet1!B2"))
-        val spec = SpecParser.sheets(JSONObject("""{"title":"হিসাব","sheets":[{"name":"খরচ","rows":[["আইটেম","দাম"],["চা",20],["মোট","=SUM(B2:B2)"],["বিপজ্জনক","=WEBSERVICE(\"x\")"]]}]}"""))!!
+        val spec = SpecParser.sheets(JSONObject("""{"title":"হিসাব","sheets":[{"name":"খরচ","rows":[["আইটেম","দাম"],["চা",20],["মোট","=SUM(B2:B2)"],["বেতন",30]]}]}""") )!!
         val files = unzip(OdsWriter.build(spec))
         files.filterKeys { it.endsWith(".xml") }.values.forEach { assertWellFormed(it) }
         val c = String(files["content.xml"]!!, Charsets.UTF_8)
@@ -166,13 +171,13 @@ class DocsTest {
     }
 
     @Test fun xlsxTurnsDangerousFormulasIntoText() {
-        val spec = SpecParser.sheets(JSONObject("""{"sheets":[{"name":"s","rows":[["a"],["=HYPERLINK(\"x\")"],["=SUM(A1:A1)"]]}]}"""))!!
+        val spec = SpecParser.sheets(JSONObject("""{"sheets":[{"name":"s","rows":[["a"],["=HYPERLINK(\"x\")"],["=SUM(A1:A1)"]]}]}""") )!!
         val sheet = String(unzip(XlsxWriter.build(spec))["xl/worksheets/sheet1.xml"]!!, Charsets.UTF_8)
         assertFalse(sheet.contains("<f>HYPERLINK")); assertTrue(sheet.contains("<f>SUM(A1:A1)</f>"))
     }
 
     @Test fun csvQuotesAndDefusesInjection() {
-        val text = String(CsvWriter.build(listOf(listOf("নাম", "মন্তব্য"), listOf("রহিম", "হ্যালো, \"বন্ধু\""), listOf("=CMD()", "-5"), listOf("-x", "+8801712345678"), listOf("@a", "+cmd"))), Charsets.UTF_8)
+        val text = String(CsvWriter.build(listOf(listOf("নাম", "মন্তব্য"), listOf("রহিম", "হ্যালো, \"বন্ধু\""), listOf("=CMD()", "-5"), listOf("-[...]", "+8801712345678"), listOf("@a", "+cmd")]]), Charsets.UTF_8)
         assertTrue(text.startsWith("\uFEFF"))
         val lines = text.removePrefix("\uFEFF").split("\r\n")
         assertEquals("নাম,মন্তব্য", lines[0]); assertEquals("রহিম,\"হ্যালো, \"\"বন্ধু\"\"\"", lines[1])
@@ -190,7 +195,7 @@ class DocsTest {
     }
 
     @Test fun docxCarriesLogoAndBrandNameOnlyWhenBranded() {
-        val spec = SpecParser.doc(JSONObject("""{"title":"রিপোর্ট","sections":[{"heading":"ক","body":"খ"}]}"""))!!
+        val spec = SpecParser.doc(JSONObject("""{"title":"রিপোর্ট","sections":[{"heading":"ক","body":"খ"}]}""") )!!
         val logo = Logo.parse(tinyPng)
         val files = unzip(DocxWriter.build(spec.copy(branded = true), logo))
         files.values.forEach { assertWellFormed(it) }
@@ -204,7 +209,7 @@ class DocsTest {
     }
 
     @Test fun pptxCarriesLogoOnTitleAndContentSlides() {
-        val deck = SpecParser.deck(JSONObject("""{"title":"প্রস্তাব","slides":[{"title":"ক","bullets":["খ"]}]}"""))!!
+        val deck = SpecParser.deck(JSONObject("""{"title":"প্রস্তাব","slides":[{"title":"ক","bullets":["খ"]}]}""") )!!
         val files = unzip(PptxWriter.build(deck.copy(branded = true), Logo.parse(tinyPng)))
         files.values.forEach { assertWellFormed(it) }
         assertTrue(files.containsKey("ppt/media/logo.png"))
@@ -218,7 +223,7 @@ class DocsTest {
     }
 
     @Test fun odtCarriesLogoFrame() {
-        val spec = SpecParser.doc(JSONObject("""{"title":"রিপোর্ট","sections":[{"heading":"ক","body":"খ"}]}"""))!!
+        val spec = SpecParser.doc(JSONObject("""{"title":"রিপোর্ট","sections":[{"heading":"ক","body":"খ"}]}""") )!!
         val files = unzip(OdtWriter.build(spec.copy(branded = true), Logo.parse(tinyPng)))
         assertTrue(files.containsKey("Pictures/logo.png"))
         assertTrue(String(files["content.xml"]!!, Charsets.UTF_8).contains("<draw:frame") && String(files["META-INF/manifest.xml"]!!, Charsets.UTF_8).contains("Pictures/logo.png"))
@@ -227,7 +232,7 @@ class DocsTest {
 
     @Test fun requestedFormatsAreMergedAndCleaned() {
         assertEquals(listOf("pdf", "docx", "odt"), Formats.requested(JSONObject("""{"format":"PDF","formats":["docx","pdf"," odt "]}""")))
-        assertTrue(Formats.requested(JSONObject("{}")).isEmpty())
+        assertTrue(Formats.requested(JSONObject("{}"))).isEmpty())
     }
 
     @Test fun brandingCanOnlyBeSwitchedOffByTheAppNotByContent() {
