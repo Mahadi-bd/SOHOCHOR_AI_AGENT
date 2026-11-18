@@ -23,6 +23,7 @@ data class Memory(@PrimaryKey(autoGenerate = true) val id: Long = 0, val type: S
     @Insert suspend fun insertConversation(c: Conversation): Long
     @Query("SELECT id FROM conversations ORDER BY id LIMIT 1") suspend fun firstConversationId(): Long?
     @Insert suspend fun insertMessage(m: Message): Long
+    @Query("DELETE FROM messages") suspend fun clearMessages()
     @Query("SELECT * FROM messages WHERE conversationId = :cid ORDER BY id") fun messages(cid: Long): Flow<List<Message>>
     @Query("SELECT * FROM messages WHERE conversationId = :cid ORDER BY id DESC LIMIT :n") suspend fun lastMessages(cid: Long, n: Int): List<Message>
 }

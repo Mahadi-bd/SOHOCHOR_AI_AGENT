@@ -20,6 +20,9 @@ class LlmRouter(private val store: SecretStore, private val clients: (ProviderTy
     }
 
     @Synchronized
+    fun removeKey(type: ProviderType, apiKey: String) { configs = configs.filterNot { it.type == type && it.apiKey == apiKey }; save() }
+
+    @Synchronized
     fun remove(type: ProviderType) { configs = configs.filterNot { it.type == type }; save() }
 
     override suspend fun chat(system: String?, messages: List<ChatMsg>): Result<String> {

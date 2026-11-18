@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -90,7 +91,7 @@ fun ChatScreen(vm: MainViewModel, onAddKey: () -> Unit) {
     val state by vm.chat.collectAsState()
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
-    LaunchedEffect(state.messages.size) { if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.size - 1) }
+    LaunchedEffect(state.messages.size, state.sending) { if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.size - 1) }
 
     Column(Modifier.fillMaxSize().imePadding()) {
         Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
@@ -112,6 +113,7 @@ fun ChatScreen(vm: MainViewModel, onAddKey: () -> Unit) {
                 }
             }
         }
+        if (state.sending) ThinkingIndicator(state.status ?: "ভাবছি…", state.elapsedSec) { vm.stop() }
         state.error?.let { SelectionContainer { Text("${it.message} ${it.fix}", Modifier.padding(12.dp), color = MaterialTheme.colorScheme.error) } }
         state.notice?.let { n -> SelectionContainer { Text(n, Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.bodySmall) } }
         state.pending?.let { p ->
@@ -200,7 +202,7 @@ fun DocumentsScreen(vm: MainViewModel) {
                 Column(Modifier.padding(12.dp)) {
                     Text(d.name, style = MaterialTheme.typography.titleSmall)
                     Text("${d.sizeKb} KB · ${fmtTime(d.modified)}", style = MaterialTheme.typography.bodySmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = {
                             vm.uriFor(d.name)?.let { uri ->
                                 runCatching {
@@ -214,6 +216,7 @@ fun DocumentsScreen(vm: MainViewModel) {
                                 runCatching { ctx.startActivity(Intent.createChooser(send, "শেয়ার করুন")) }
                             }
                         }) { Text("শেয়ার") }
+                        TextButton(onClick = { vm.moveDocumentToVault(d.name) }) { Text("ভল্টে রাখুন") }
                         TextButton(onClick = { vm.deleteDocument(d.name) }) { Text("মুছুন") }
                     }
                     googleApp(d.name)?.let { (pkg, label) ->

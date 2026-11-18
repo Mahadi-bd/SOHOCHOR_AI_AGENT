@@ -32,6 +32,8 @@ class AgentEngine(
     private val memoryContext: suspend () -> String,
     private val audit: suspend (action: String, detail: String) -> Unit,
     private val now: () -> ZonedDateTime = { ZonedDateTime.now() },
+    /** Tells the UI what the agent is doing right now, so a slow answer never looks like a freeze. */
+    private val onStatus: (String) -> Unit = {},
 ) {
     private val byName = tools.associateBy { it.name }
 
@@ -39,7 +41,7 @@ class AgentEngine(
 
     suspend fun resume(p: PendingAction, approved: Boolean): AgentStep {
         val msgs = p.transcript.toMutableList()
-        val result = if (approved) exec(byName[p.tool], p.args) else {
+        val result = if (approved) { onStatus(ToolLabels.of(p.tool)); exec(byName[p.tool], p.args) } else {
             audit("rejected:${p.tool}", p.args.toString().take(300))
             ToolResult(false, "USER_REJECTED: ব্যবহারকারী অনুমতি দেননি, কাজটি করা হয়নি।")
         }
@@ -48,7 +50,8 @@ class AgentEngine(
     }
 
     private suspend fun loop(msgs: MutableList<ChatMsg>): AgentStep {
-        repeat(MAX_STEPS) {
+        repeat(MAX_STEPS) { step ->
+            onStatus(if (step == 0) "ভাবছি…" else "উত্তর তৈরি করছি…")
             val reply = chatter.chat(systemPrompt(), msgs).getOrElse {
                 return AgentStep.Failed((it as? LlmException)?.error ?: LlmError.Unknown("agent"))
             }
@@ -63,6 +66,7 @@ class AgentEngine(
             val tool = byName[call.tool]
             if (tool == null) { msgs += ChatMsg("user", "TOOL_RESULT: unknown tool '${call.tool}'"); return@repeat }
             if (tool.risk == Risk.HIGH) return AgentStep.Confirm(PendingAction(tool.name, call.args, tool.describe(call.args), msgs.toList()))
+            onStatus(ToolLabels.of(tool.name))
             msgs += ChatMsg("user", "TOOL_RESULT ${tool.name}: ${exec(tool, call.args).text}")
         }
         return AgentStep.Reply("কাজটি শেষ করতে পারিনি। একটু অন্যভাবে বলে দেখবেন?")
@@ -115,4 +119,16 @@ $mem
             return out
         }
     }
+}
+
+/** Short Bengali status text for each tool, shown under the thinking animation. */
+object ToolLabels {
+    private val labels = mapOf(
+        "create_reminder" to "রিমাইন্ডার সেট করছি…", "list_tasks" to "কাজের তালিকা দেখছি…", "complete_task" to "কাজ সম্পন্ন করছি…",
+        "delete_task" to "কাজ মুছছি…", "remember" to "মনে রাখছি…", "recall" to "স্মৃতি খুঁজছি…", "fetch_url" to "ওয়েবপেজ পড়ছি…",
+        "create_document" to "ফাইল বানাচ্ছি… (একটু সময় লাগতে পারে)", "zip_documents" to "ZIP বানাচ্ছি…", "create_zip" to "ZIP বানাচ্ছি…",
+    )
+    private val phone = setOf("set_alarm", "set_timer", "dial", "compose_sms", "compose_email", "add_calendar_event", "open_url", "open_maps", "share_text", "open_app")
+
+    fun of(tool: String): String = labels[tool] ?: if (tool in phone) "ফোনের স্ক্রিন খুলছি…" else "কাজ করছি…"
 }

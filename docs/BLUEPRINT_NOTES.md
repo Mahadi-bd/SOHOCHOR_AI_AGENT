@@ -13,4 +13,9 @@ Nothing here changes the blueprint modules; each item extends one of them.
 | Phone actions use system screens (alarm, timer, calendar, dial, SMS/email draft, maps, share, open app) | M7 Phone Control | No risky permissions; dial, SMS and email need the user's confirmation. |
 | Several models per API key with automatic fallback; keys rotate on rate limits | LLM router | `ModelFallback`, `ModelProbe`. |
 
-Still to build (in blueprint order): security vault with biometric lock (M10), settings screen with key management, voice, 3D, native Google integration, Play Billing for the paid tier.
+| Live "thinking" indicator with status text, seconds counter and a Stop button | UX, agent engine | `ThinkingIndicator`; `AgentEngine.onStatus`; the job is cancellable end to end. Runs offline (no web embed). |
+| Encrypted vault opened with fingerprint or screen lock | M10 Security Vault | Files and file names AES-256-GCM, key in the Android Keystore; never visible to the AI tools; locks when the app leaves the screen. |
+| App lock and screenshot block (optional, in Settings) | M10 | System BiometricPrompt with PIN/pattern fallback. |
+| Settings: keys (masked), theme, pinned document colour, security, clear chat | UI | `SettingsScreen`. |
+
+Still to build (in blueprint order): voice, 3D, native Google integration, Play Billing for the paid tier.

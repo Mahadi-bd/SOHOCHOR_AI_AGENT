@@ -45,5 +45,7 @@ class DocumentStore(private val ctx: Context) {
 
     fun delete(name: String) { named(name)?.delete() }
 
+    fun fileOf(name: String): File? = named(name)
+
     fun uriFor(name: String): Uri? = named(name)?.let { FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", it) }
 }

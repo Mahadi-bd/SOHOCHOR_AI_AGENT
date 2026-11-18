@@ -18,7 +18,7 @@ internal object Formats {
     }
 }
 
-class CreateDocumentTool(private val store: DocumentStore) : Tool {
+class CreateDocumentTool(private val store: DocumentStore, private val themeOverride: () -> String? = { null }) : Tool {
     override val name = "create_document"
     override val help = "Create modern, styled files from ONE content. args: format or formats (list of pdf|docx|odt|xlsx|ods|csv|pptx), title, theme (blue|green|purple|orange|teal|red; pick one that suits the topic), zip (true to also bundle the created files into a ZIP). " +
         "pdf/docx/odt: sections=[{heading, body, bullets:[...], table:[[header,...],[cell,...]]}]. " +
@@ -30,6 +30,7 @@ class CreateDocumentTool(private val store: DocumentStore) : Tool {
     override suspend fun execute(args: JSONObject): ToolResult = withContext(Dispatchers.IO) {
         val formats = Formats.requested(args)
         if (formats.isEmpty()) return@withContext ToolResult(false, "format is missing; use one of ${Formats.all.joinToString()}")
+        themeOverride()?.let { args.put("theme", it) } // a colour the user pinned in Settings wins over the model's choice
         val branded = Branding.enabled() // decided by the app (a paid tier later), never by the model
         val logo = store.logo()
         val created = mutableListOf<String>()

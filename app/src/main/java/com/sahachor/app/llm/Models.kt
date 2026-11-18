@@ -40,3 +40,6 @@ private fun offlineFix(reason: String): String = when {
     reason == "SSL" -> "নিরাপদ সংযোগ তৈরি হয়নি। ফোনের তারিখ-সময় Automatic আছে কিনা দেখুন, অথবা অন্য নেটওয়ার্কে চেষ্টা করুন।"
     else -> "নেট চালু আছে কিনা দেখে আবার চেষ্টা করুন; না হলে অন্য নেটওয়ার্কে চেষ্টা করুন।"
 }
+
+/** Shows only the first and last characters of a secret, so a screen or screenshot never reveals the whole key. */
+fun maskKey(key: String): String = if (key.length <= 10) "••••" else key.take(4) + "••••" + key.takeLast(3)
