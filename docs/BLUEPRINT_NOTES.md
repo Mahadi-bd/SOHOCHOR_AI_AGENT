@@ -18,4 +18,9 @@ Nothing here changes the blueprint modules; each item extends one of them.
 | App lock and screenshot block (optional, in Settings) | M10 | System BiometricPrompt with PIN/pattern fallback. |
 | Settings: keys (masked), theme, pinned document colour, security, clear chat | UI | `SettingsScreen`. |
 
-Still to build (in blueprint order): voice, 3D, native Google integration, Play Billing for the paid tier.
+| Voice: speak commands (Bengali or English) and optional spoken answers | M12 Voice | `VoiceInput` (the phone's recognizer) and `Speaker` (text-to-speech). Spoken sentences go through the same agent and confirmation gate as typed ones. |
+| 3D loader (turning cube behind the bird) | M12 3D | `Mesh3D` is plain maths drawn on a Compose canvas: offline, no web view. A model viewer (three.js) stays on the roadmap. |
+| "Drive-এ পাঠান": creates native Google Docs/Sheets/Slides in the user's Drive | M13 Integrations | `drive.file` scope only; needs the one-time setup in `docs/GOOGLE_SETUP.md`. |
+| Paid tier that removes the branding (Google Play subscription `remove_branding`) | monetisation | `BillingManager` sets `Entitlements`; setup in `docs/BILLING_SETUP.md`. Works only for Play Store installs. |
+
+Next in the blueprint: Web Watcher (site monitoring and document search with alerts), then 3D model viewer and native Google Docs editing.

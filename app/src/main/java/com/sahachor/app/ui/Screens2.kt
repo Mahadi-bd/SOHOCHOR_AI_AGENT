@@ -23,6 +23,7 @@ import com.sahachor.app.R
 import com.sahachor.app.core.BioStatus
 import com.sahachor.app.core.Biometrics
 import com.sahachor.app.llm.maskKey
+import com.sahachor.app.docs.Entitlements
 import com.sahachor.app.docs.Palette
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -146,6 +147,11 @@ fun SettingsScreen(vm: MainViewModel, onAddKey: () -> Unit, onOpenMemory: () -> 
     val appLock by s.appLock.collectAsState()
     val secure by s.secureScreen.collectAsState()
     val keys by vm.keyList.collectAsState()
+    val pro by Entitlements.proState.collectAsState()
+    val bill by vm.billing.state.collectAsState()
+    val voiceAuto by s.voiceAutoSend.collectAsState()
+    val speak by s.speakReplies.collectAsState()
+    val voiceLang by s.voiceLang.collectAsState()
     var confirmClear by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf<String?>(null) }
     val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull().orEmpty() }
@@ -166,6 +172,32 @@ fun SettingsScreen(vm: MainViewModel, onAddKey: () -> Unit, onOpenMemory: () -> 
             }
         }
         OutlinedButton(onClick = onAddKey) { Text("কী যোগ করুন") }
+
+        SectionTitle("LIFE EASY Pro")
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (pro) {
+                    Text("✅ চালু আছে: ডকুমেন্টে LIFE EASY লোগো ও নাম থাকে না।")
+                } else {
+                    Text("ডকুমেন্ট (PDF, Word, স্লাইড…) থেকে LIFE EASY লোগো ও নাম সরান।")
+                    if (bill.loading) Text("লোড হচ্ছে…", style = MaterialTheme.typography.bodySmall)
+                    else if (!bill.available) Text("Google Play সংযোগ পাওয়া যাচ্ছে না। Play Store থেকে ইনস্টল করা অ্যাপে এটা চালু হবে।", style = MaterialTheme.typography.bodySmall)
+                    else if (!bill.productFound) Text("সাবস্ক্রিপশন প্ল্যান এখনো Play Console-এ তৈরি হয়নি।", style = MaterialTheme.typography.bodySmall)
+                    else Button(onClick = { activity?.let { vm.billing.buy(it) } }) { Text("সাবস্ক্রাইব করুন" + (bill.price?.let { " · $it" } ?: "")) }
+                }
+                bill.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                OutlinedButton(onClick = { vm.billing.refresh() }) { Text("কেনা পুনরুদ্ধার / আবার দেখুন") }
+            }
+        }
+
+        SectionTitle("ভয়েস")
+        SwitchRow("কথা শেষ হলেই পাঠান", "মাইকে বলা শেষ হলে নিজে থেকে এজেন্টকে পাঠাবে", voiceAuto) { s.setVoiceAutoSend(it) }
+        SwitchRow("উত্তর পড়ে শোনান", "এজেন্টের উত্তর ফোনের ভয়েসে পড়বে (বাংলা ভয়েস ইনস্টল থাকলে বাংলায়)", speak) { s.setSpeakReplies(it) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("bn-BD" to "বাংলা", "en-US" to "English").forEach { (v, label) ->
+                FilterChip(selected = voiceLang == v, onClick = { s.setVoiceLang(v) }, label = { Text(label) })
+            }
+        }
 
         SectionTitle("চেহারা")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -197,6 +229,9 @@ fun SettingsScreen(vm: MainViewModel, onAddKey: () -> Unit, onOpenMemory: () -> 
         SectionTitle("ডেটা")
         OutlinedButton(onClick = onOpenMemory) { Text("AI যা মনে রেখেছে দেখুন") }
         OutlinedButton(onClick = { confirmClear = true }) { Text("চ্যাটের ইতিহাস মুছুন") }
+
+        SectionTitle("Google")
+        Text("ডকুমেন্ট ট্যাবে প্রতিটা ফাইলের পাশে \"Drive-এ পাঠান\" চাপলে আপনার Google Drive-এ আসল Google Docs/Sheets/Slides ফাইল তৈরি হয়। অ্যাপ শুধু নিজের তৈরি ফাইলই দেখতে পারে।", style = MaterialTheme.typography.bodySmall)
 
         SectionTitle("সম্পর্কে")
         Text("সহচর · LIFE EASY\nসংস্করণ $version\nআপনার API কী ও ডেটা শুধু এই ফোনে এনক্রিপ্টেড থাকে।", style = MaterialTheme.typography.bodySmall)

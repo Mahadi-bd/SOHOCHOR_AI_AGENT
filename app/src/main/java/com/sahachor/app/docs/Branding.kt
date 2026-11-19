@@ -15,11 +15,16 @@ class Logo private constructor(val png: ByteArray, val width: Int, val height: I
 }
 
 object Entitlements {
+    private val state = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val proState: kotlinx.coroutines.flow.StateFlow<Boolean> get() = state
+
     /**
-     * Paid "remove branding" tier. Always false for now; a later phase connects this to Google Play Billing.
-     * The AI tools never receive a way to switch branding off, so only this flag can.
+     * Paid "remove branding" tier. False until Google Play Billing confirms a subscription (see BillingManager).
+     * The AI tools get no way to switch branding off; only this flag can.
      */
-    val isPro: Boolean = false
+    val isPro: Boolean get() = state.value
+
+    fun set(pro: Boolean) { state.value = pro }
 }
 
 object Branding {

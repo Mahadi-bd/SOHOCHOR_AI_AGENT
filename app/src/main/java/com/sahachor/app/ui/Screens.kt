@@ -13,7 +13,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import com.sahachor.app.google.GoogleAuth
+import com.sahachor.app.voice.VoiceInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -91,6 +98,42 @@ fun ChatScreen(vm: MainViewModel, onAddKey: () -> Unit) {
     val state by vm.chat.collectAsState()
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val voiceCtx = LocalContext.current
+    val voice = remember { VoiceInput(voiceCtx) }
+    DisposableEffect(Unit) { onDispose { voice.stop() } }
+    var listening by remember { mutableStateOf(false) }
+    var voiceNote by remember { mutableStateOf<String?>(null) }
+    val voiceAuto by vm.settings.voiceAutoSend.collectAsState()
+    val voiceLang by vm.settings.voiceLang.collectAsState()
+    fun startVoice() {
+        voiceNote = null
+        listening = true
+        voice.start(
+            voiceLang,
+            onText = { t -> input = t },
+            onFinalText = { t ->
+                val busy = vm.chat.value.sending || vm.chat.value.pending != null
+                if (voiceAuto && !busy) { vm.send(t); input = "" } else { input = t }
+            },
+            onProblem = { m -> voiceNote = m },
+            onStopped = { listening = false },
+        )
+    }
+    val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        if (ok) startVoice() else voiceNote = "মাইক্রোফোনের অনুমতি ছাড়া ভয়েস চলবে না।"
+    }
+    fun onMicClick() {
+        if (listening) {
+            voice.stop(); listening = false
+        } else if (!voice.available()) {
+            voiceNote = "এই ফোনে ভয়েস চেনার সেবা পাওয়া যায়নি। Google অ্যাপ আপডেট করুন।"
+        } else if (voiceCtx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            startVoice()
+        } else {
+            micPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
     LaunchedEffect(state.messages.size, state.sending) { if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.size - 1) }
 
     Column(Modifier.fillMaxSize().imePadding()) {
@@ -128,9 +171,13 @@ fun ChatScreen(vm: MainViewModel, onAddKey: () -> Unit) {
                 }
             }
         }
+        if (listening) Text("🎤 শুনছি… বলুন (${if (voiceLang.startsWith("bn")) "বাংলা" else "English"})", Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall)
+        voiceNote?.let { Text(it, Modifier.padding(horizontal = 12.dp), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(value = input, onValueChange = { input = it }, modifier = Modifier.weight(1f), placeholder = { Text("বার্তা লিখুন…") }, maxLines = 4)
-            Spacer(Modifier.width(8.dp))
+            OutlinedTextField(value = input, onValueChange = { input = it }, modifier = Modifier.weight(1f), placeholder = { Text("লিখুন বা 🎤 চেপে বলুন…") }, maxLines = 4)
+            Spacer(Modifier.width(6.dp))
+            OutlinedButton(onClick = { onMicClick() }, contentPadding = PaddingValues(horizontal = 10.dp)) { Text(if (listening) "⏹" else "🎤") }
+            Spacer(Modifier.width(6.dp))
             Button(enabled = input.isNotBlank() && !state.sending && state.pending == null, onClick = { vm.send(input); input = "" }) { Text(if (state.sending) "…" else "পাঠান") }
         }
     }
@@ -194,8 +241,32 @@ fun DocumentsScreen(vm: MainViewModel) {
     val docs by vm.documents.collectAsState()
     val ctx = LocalContext.current
     LaunchedEffect(Unit) { vm.refreshDocuments() }
+    val driveMsg by vm.driveMessage.collectAsState()
+    var pendingDrive by remember { mutableStateOf<String?>(null) }
+    val activity = ctx as? android.app.Activity
+    val consent = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
+        val name = pendingDrive
+        val token = if (activity != null && r.resultCode == android.app.Activity.RESULT_OK) GoogleAuth.tokenFromResult(activity, r.data) else null
+        if (name != null && token != null) vm.uploadToDrive(name, token) else vm.setDriveMessage("Google-এর অনুমতি দেওয়া হয়নি।")
+    }
+    fun sendToDrive(name: String) {
+        val a = activity ?: return
+        pendingDrive = name
+        vm.setDriveMessage("Google-এর সাথে যোগাযোগ করছি…")
+        GoogleAuth.authorize(a, onToken = { vm.uploadToDrive(name, it) }, onNeedsUi = { sender -> consent.launch(IntentSenderRequest.Builder(sender).build()) }, onError = { vm.setDriveMessage(it) })
+    }
     if (docs.isEmpty()) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("কোনো ফাইল নেই। চ্যাটে বলুন: \"/meeting …\" বা \"এই তথ্যগুলো দিয়ে একটা PDF বানাও\"") }; return }
     LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        driveMsg?.let { m ->
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(m.text)
+                        m.link?.let { link -> TextButton(onClick = { runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(link))) } }) { Text("Google-এ খুলুন") } }
+                    }
+                }
+            }
+        }
         item { OutlinedButton(onClick = { vm.zipAll() }) { Text("সব ফাইল ZIP করুন") } }
         items(docs, key = { it.name }) { d ->
             Card(Modifier.fillMaxWidth()) {
@@ -216,6 +287,7 @@ fun DocumentsScreen(vm: MainViewModel) {
                                 runCatching { ctx.startActivity(Intent.createChooser(send, "শেয়ার করুন")) }
                             }
                         }) { Text("শেয়ার") }
+                        TextButton(onClick = { sendToDrive(d.name) }) { Text("Drive-এ পাঠান") }
                         TextButton(onClick = { vm.moveDocumentToVault(d.name) }) { Text("ভল্টে রাখুন") }
                         TextButton(onClick = { vm.deleteDocument(d.name) }) { Text("মুছুন") }
                     }

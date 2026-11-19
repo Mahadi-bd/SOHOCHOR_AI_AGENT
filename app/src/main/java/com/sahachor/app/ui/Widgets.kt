@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.sahachor.app.R
 
 /**
- * Shown while the agent works: a ring turning around the hovering LIFE EASY bird, what it is doing right now,
+ * Shown while the agent works: a 3D cube turning behind the hovering LIFE EASY bird, what it is doing right now,
  * how many seconds have passed, and a Stop button. Runs fully on the phone, so it also works offline.
  */
 @Composable
@@ -38,8 +38,8 @@ fun ThinkingIndicator(status: String, elapsedSec: Int, onStop: () -> Unit) {
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(Modifier.fillMaxSize(), strokeWidth = 3.dp)
-                Image(painterResource(R.drawable.life_easy_logo), contentDescription = null, modifier = Modifier.size(30.dp).offset(y = bob.dp))
+                Spinner3D(Modifier.fillMaxSize(), MaterialTheme.colorScheme.primary)
+                Image(painterResource(R.drawable.life_easy_logo), contentDescription = null, modifier = Modifier.size(26.dp).offset(y = bob.dp))
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {

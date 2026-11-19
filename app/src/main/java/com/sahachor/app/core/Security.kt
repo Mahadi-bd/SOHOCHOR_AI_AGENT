@@ -15,10 +15,16 @@ class AppSettings(ctx: Context) {
     val docTheme = MutableStateFlow(prefs.getString("doc_theme", "auto") ?: "auto")    // auto | blue | green | ...
     val appLock = MutableStateFlow(prefs.getBoolean("app_lock", false))
     val secureScreen = MutableStateFlow(prefs.getBoolean("secure_screen", false))
+    val voiceAutoSend = MutableStateFlow(prefs.getBoolean("voice_auto_send", true))   // send the sentence as soon as speaking ends
+    val speakReplies = MutableStateFlow(prefs.getBoolean("speak_replies", false))     // read answers aloud
+    val voiceLang = MutableStateFlow(prefs.getString("voice_lang", "bn-BD") ?: "bn-BD") // bn-BD | en-US
 
     fun setThemeMode(v: String) { prefs.edit().putString("theme", v).apply(); themeMode.value = v }
     fun setDocTheme(v: String) { prefs.edit().putString("doc_theme", v).apply(); docTheme.value = v }
     fun setAppLock(v: Boolean) { prefs.edit().putBoolean("app_lock", v).apply(); appLock.value = v }
+    fun setVoiceAutoSend(v: Boolean) { prefs.edit().putBoolean("voice_auto_send", v).apply(); voiceAutoSend.value = v }
+    fun setSpeakReplies(v: Boolean) { prefs.edit().putBoolean("speak_replies", v).apply(); speakReplies.value = v }
+    fun setVoiceLang(v: String) { prefs.edit().putString("voice_lang", v).apply(); voiceLang.value = v }
     fun setSecureScreen(v: Boolean) { prefs.edit().putBoolean("secure_screen", v).apply(); secureScreen.value = v }
 }
 

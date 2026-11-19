@@ -10,10 +10,13 @@ import com.sahachor.app.core.AppSettings
 import com.sahachor.app.core.SessionLock
 import com.sahachor.app.data.*
 import com.sahachor.app.llm.*
+import com.sahachor.app.billing.BillingManager
+import com.sahachor.app.google.DriveExporter
 import com.sahachor.app.vault.VaultItem
 import com.sahachor.app.vault.VaultNames
 import com.sahachor.app.vault.VaultStore
 import com.sahachor.app.vault.readLimited
+import com.sahachor.app.voice.SpeechText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -31,10 +34,27 @@ data class ChatUi(
     val status: String? = null, val elapsedSec: Int = 0,
 )
 data class DocItem(val name: String, val sizeKb: Long, val modified: Long)
+data class DriveMsg(val text: String, val link: String? = null)
 
 class MainViewModel(private val app: SahachorApp) : ViewModel() {
     val settings: AppSettings get() = app.settings
     val session: SessionLock get() = app.session
+    val billing: BillingManager get() = app.billing
+
+    private val _driveMessage = MutableStateFlow<DriveMsg?>(null)
+    val driveMessage: StateFlow<DriveMsg?> = _driveMessage
+    fun setDriveMessage(text: String?) { _driveMessage.value = text?.let { DriveMsg(it) } }
+
+    /** Creates a native Google Doc, Sheet or Slides file in the user's Drive from a document. The token is used once and discarded. */
+    fun uploadToDrive(name: String, token: String) {
+        viewModelScope.launch {
+            _driveMessage.value = DriveMsg("Google Drive-এ পাঠানো হচ্ছে…")
+            val f = withContext(Dispatchers.IO) { app.documents.fileOf(name) }
+            if (f == null) { _driveMessage.value = DriveMsg("ফাইল পাওয়া যায়নি।"); return@launch }
+            val r = DriveExporter.upload(token, f)
+            _driveMessage.value = DriveMsg(r.message, r.link)
+        }
+    }
 
     private val _setup = MutableStateFlow(SetupUi())
     val setup: StateFlow<SetupUi> = _setup
@@ -146,12 +166,13 @@ class MainViewModel(private val app: SahachorApp) : ViewModel() {
         }
     }
 
-    fun stop() { sendJob?.cancel() }
+    fun stop() { sendJob?.cancel(); if (app.settings.speakReplies.value) app.speaker.stop() }
 
     fun send(text: String) {
         val clean = text.trim()
         val cur = _chat.value
         if (clean.isEmpty() || cur.sending || cur.pending != null) return
+        if (app.settings.speakReplies.value) app.speaker.stop()
         _chat.update { it.copy(sending = true, error = null, status = "ভাবছি…", elapsedSec = 0) }
         launchWork {
             ready.await()
@@ -180,6 +201,7 @@ class MainViewModel(private val app: SahachorApp) : ViewModel() {
             is AgentStep.Reply -> {
                 record(Message(conversationId = cid ?: 0, role = "assistant", content = step.text, createdAt = System.currentTimeMillis()))
                 _chat.update { it.copy(sending = false, notice = null, hasProvider = app.router.hasProvider(), keys = keyCount()) }
+                if (app.settings.speakReplies.value) app.speaker.speak(SpeechText.forSpeaking(step.text))
             }
             is AgentStep.Confirm -> _chat.update { it.copy(sending = false, pending = step.pending) }
             is AgentStep.Failed -> _chat.update { it.copy(sending = false, error = step.error, hasProvider = app.router.hasProvider(), keys = keyCount()) }
