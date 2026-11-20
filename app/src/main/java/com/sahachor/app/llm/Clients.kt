@@ -14,6 +14,8 @@ private fun JSONObject.arr(name: String): JSONArray = optJSONArray(name) ?: JSON
 private inline fun <T> JSONArray.mapObjects(f: (JSONObject) -> T?): List<T> =
     (0 until length()).mapNotNull { optJSONObject(it)?.let(f) }
 
+private fun b64(bytes: ByteArray): String = java.util.Base64.getEncoder().encodeToString(bytes)
+
 private fun parseFail(): Nothing = throw LlmException(LlmError.Unknown("parse"))
 
 class GeminiClient : LlmClient {
@@ -32,8 +34,9 @@ class GeminiClient : LlmClient {
     override suspend fun chat(key: String, model: String, system: String?, messages: List<ChatMsg>): String {
         val contents = JSONArray()
         messages.forEach {
-            contents.put(JSONObject().put("role", if (it.role == "assistant") "model" else "user")
-                .put("parts", JSONArray().put(JSONObject().put("text", it.content))))
+            val parts = JSONArray().put(JSONObject().put("text", it.content))
+            it.images.forEach { img -> parts.put(JSONObject().put("inline_data", JSONObject().put("mime_type", "image/jpeg").put("data", b64(img)))) }
+            contents.put(JSONObject().put("role", if (it.role == "assistant") "model" else "user").put("parts", parts))
         }
         val body = JSONObject().put("contents", contents)
         if (!system.isNullOrBlank()) body.put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
@@ -58,7 +61,15 @@ class OpenAiCompatClient(override val type: ProviderType) : LlmClient {
     override suspend fun chat(key: String, model: String, system: String?, messages: List<ChatMsg>): String {
         val arr = JSONArray()
         if (!system.isNullOrBlank()) arr.put(JSONObject().put("role", "system").put("content", system))
-        messages.forEach { arr.put(JSONObject().put("role", it.role).put("content", it.content)) }
+        messages.forEach { m ->
+            if (m.images.isEmpty()) {
+                arr.put(JSONObject().put("role", m.role).put("content", m.content))
+            } else {
+                val content = JSONArray().put(JSONObject().put("type", "text").put("text", m.content))
+                m.images.forEach { img -> content.put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:image/jpeg;base64," + b64(img)))) }
+                arr.put(JSONObject().put("role", m.role).put("content", content))
+            }
+        }
         val body = JSONObject().put("model", model).put("messages", arr)
         val res = JSONObject(Http.execute("${type.baseUrl}/chat/completions", h(key), body.toString()))
         return res.arr("choices").optJSONObject(0)?.optJSONObject("message")?.optString("content")?.ifBlank { null } ?: parseFail()
@@ -76,7 +87,16 @@ class AnthropicClient : LlmClient {
 
     override suspend fun chat(key: String, model: String, system: String?, messages: List<ChatMsg>): String {
         val arr = JSONArray()
-        messages.forEach { arr.put(JSONObject().put("role", it.role).put("content", it.content)) }
+        messages.forEach { m ->
+            if (m.images.isEmpty()) {
+                arr.put(JSONObject().put("role", m.role).put("content", m.content))
+            } else {
+                val content = JSONArray()
+                m.images.forEach { img -> content.put(JSONObject().put("type", "image").put("source", JSONObject().put("type", "base64").put("media_type", "image/jpeg").put("data", b64(img)))) }
+                content.put(JSONObject().put("type", "text").put("text", m.content))
+                arr.put(JSONObject().put("role", m.role).put("content", content))
+            }
+        }
         val body = JSONObject().put("model", model).put("max_tokens", 4096).put("messages", arr)
         if (!system.isNullOrBlank()) body.put("system", system)
         val res = JSONObject(Http.execute("${type.baseUrl}/messages", h(key), body.toString()))

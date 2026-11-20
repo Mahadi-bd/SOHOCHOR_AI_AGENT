@@ -53,6 +53,8 @@ dependencies {
     implementation("androidx.fragment:fragment-ktx:1.8.5") // newer than biometric's own dependency, needed for activity 1.9
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation("org.jsoup:jsoup:1.18.1") // reads web pages and finds links
+    implementation("androidx.work:work-runtime-ktx:2.9.1") // background site checks
     implementation("com.android.billingclient:billing-ktx:7.1.1") // paid tier (Google Play Billing)
     implementation("com.google.android.gms:play-services-auth:21.2.0") // Google sign-in consent for Drive
 

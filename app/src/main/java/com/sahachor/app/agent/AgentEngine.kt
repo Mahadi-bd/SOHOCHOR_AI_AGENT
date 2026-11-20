@@ -126,7 +126,9 @@ object ToolLabels {
     private val labels = mapOf(
         "create_reminder" to "রিমাইন্ডার সেট করছি…", "list_tasks" to "কাজের তালিকা দেখছি…", "complete_task" to "কাজ সম্পন্ন করছি…",
         "delete_task" to "কাজ মুছছি…", "remember" to "মনে রাখছি…", "recall" to "স্মৃতি খুঁজছি…", "fetch_url" to "ওয়েবপেজ পড়ছি…",
-        "create_document" to "ফাইল বানাচ্ছি… (একটু সময় লাগতে পারে)", "zip_documents" to "ZIP বানাচ্ছি…", "create_zip" to "ZIP বানাচ্ছি…",
+        "create_document" to "ফাইল বানাচ্ছি… (একটু সময় লাগতে পারে)",
+        "search_site" to "সাইট পড়ছি ও ডকুমেন্ট খুঁজছি… (কয়েক মিনিট লাগতে পারে)", "watch_add" to "সাইট নজরদারিতে যোগ করছি…", "watch_list" to "নজরদারির তালিকা দেখছি…",
+        "watch_remove" to "নজরদারি বন্ধ করছি…", "watch_check_now" to "সাইটগুলো এখনই চেক করছি…", "zip_documents" to "ZIP বানাচ্ছি…", "create_zip" to "ZIP বানাচ্ছি…",
     )
     private val phone = setOf("set_alarm", "set_timer", "dial", "compose_sms", "compose_email", "add_calendar_event", "open_url", "open_maps", "share_text", "open_app")
 

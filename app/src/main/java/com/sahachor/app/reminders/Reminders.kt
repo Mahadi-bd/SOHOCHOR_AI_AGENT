@@ -15,11 +15,30 @@ import kotlinx.coroutines.launch
 
 object Notifier {
     const val CHANNEL = "reminders"
+    const val WATCH_CHANNEL = "watch"
 
     fun ensureChannel(ctx: Context) {
         if (Build.VERSION.SDK_INT < 26) return
         val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
         nm.createNotificationChannel(NotificationChannel(CHANNEL, "রিমাইন্ডার", NotificationManager.IMPORTANCE_HIGH))
+        nm.createNotificationChannel(NotificationChannel(WATCH_CHANNEL, "সাইট নজরদারি", NotificationManager.IMPORTANCE_DEFAULT))
+    }
+
+    /** A new document was found on a watched site. Tapping opens the document link (or the app). */
+    fun showWatch(ctx: Context, id: Int, title: String, text: String, url: String?) {
+        val nm = NotificationManagerCompat.from(ctx)
+        if (!nm.areNotificationsEnabled()) return
+        val target = if (url != null) android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)) else ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
+        val open = target?.let { PendingIntent.getActivity(ctx, 100_000 + id, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT) }
+        val n = NotificationCompat.Builder(ctx, WATCH_CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setContentIntent(open)
+            .build()
+        try { nm.notify(100_000 + id, n) } catch (e: SecurityException) { /* notification permission revoked */ }
     }
 
     fun show(ctx: Context, id: Long, title: String) {

@@ -23,4 +23,9 @@ Nothing here changes the blueprint modules; each item extends one of them.
 | "Drive-এ পাঠান": creates native Google Docs/Sheets/Slides in the user's Drive | M13 Integrations | `drive.file` scope only; needs the one-time setup in `docs/GOOGLE_SETUP.md`. |
 | Paid tier that removes the branding (Google Play subscription `remove_branding`) | monetisation | `BillingManager` sets `Entitlements`; setup in `docs/BILLING_SETUP.md`. Works only for Play Store installs. |
 
-Next in the blueprint: Web Watcher (site monitoring and document search with alerts), then 3D model viewer and native Google Docs editing.
+| Web Watcher: watch a website for new documents, read them with the user's own AI key (scanned Bengali PDFs through vision), notify; plus one-off site search | new module M14 | `watch/` package (`WatchEngine`, `WatchWorker`), agent tools `watch_add`, `watch_list`, `watch_remove`, `watch_check_now`, `search_site`. DB version 2 with a migration that keeps all existing data. https sites only; background checks at best every 15 minutes (Android WorkManager). |
+
+## Planned UI/UX redesign (decided, not built yet)
+Direction from the owner: a Cyberpunk-inspired neon dark UI with glassmorphism and a glowing orb AI avatar, plus a Planet Earth `.glb` 3D model that the owner will supply. All current screens (`ui/` package) are temporary. When the redesign starts: put colours, shapes and glass effects in one theme layer first, then restyle screen by screen; the orb replaces the bird/cube in `ThinkingIndicator`; the `.glb` goes through a model viewer (three.js in a web view or a native renderer).
+
+Next in the blueprint: the UI/UX redesign, 3D model viewer, native Google Docs editing, optional Telegram alerts for the watcher.

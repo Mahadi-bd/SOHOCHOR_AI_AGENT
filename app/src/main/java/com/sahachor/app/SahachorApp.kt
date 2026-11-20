@@ -7,6 +7,7 @@ import com.sahachor.app.core.SecretStore
 import com.sahachor.app.core.SessionLock
 import com.sahachor.app.docs.Entitlements
 import com.sahachor.app.voice.Speaker
+import com.sahachor.app.watch.WatchScheduler
 import com.sahachor.app.vault.VaultCrypto
 import com.sahachor.app.vault.VaultKeys
 import com.sahachor.app.vault.VaultStore
@@ -45,6 +46,7 @@ class SahachorApp : Application() {
         router = LlmRouter(secrets)
         scheduler = ReminderScheduler(this)
         Notifier.ensureChannel(this)
+        try { WatchScheduler.ensurePeriodic(this) } catch (e: Exception) { /* background checks are optional */ }
         // The paid tier is remembered (encrypted) so documents stay unbranded offline; Play Billing confirms it again on every start.
         Entitlements.set(secrets.get("pro_v1") == "1")
         appScope.launch { Entitlements.proState.collect { secrets.put("pro_v1", if (it) "1" else "0") } }

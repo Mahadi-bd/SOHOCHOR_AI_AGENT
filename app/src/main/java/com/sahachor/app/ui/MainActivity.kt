@@ -64,7 +64,7 @@ class MainActivity : FragmentActivity() {
                                 if (onboarding) OnboardingScreen(vm) { onboarding = false }
                                 else when (tab) {
                                     0 -> ChatScreen(vm) { vm.resetSetup(); onboarding = true }
-                                    1 -> TasksScreen(vm)
+                                    1 -> TasksHub(vm)
                                     2 -> DocumentsScreen(vm)
                                     3 -> VaultScreen(vm)
                                     4 -> SettingsScreen(vm, onAddKey = { vm.resetSetup(); onboarding = true }, onOpenMemory = { tab = 5 })

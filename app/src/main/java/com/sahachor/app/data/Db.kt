@@ -2,6 +2,8 @@ package com.sahachor.app.data
 
 import android.content.Context
 import androidx.room.*
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import java.io.File
@@ -51,12 +53,51 @@ data class Memory(@PrimaryKey(autoGenerate = true) val id: Long = 0, val type: S
     @Query("SELECT * FROM audit_log ORDER BY id DESC LIMIT :n") suspend fun recent(n: Int): List<AuditLog>
 }
 
-@Database(entities = [Conversation::class, Message::class, Memory::class, TaskItem::class, AuditLog::class], version = 1, exportSchema = false)
+/** A website the user asked the agent to watch. goal is plain words; keywords (comma separated) are optional extra filters. */
+@Entity(tableName = "watch_sites")
+data class WatchSite(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0, val url: String, val name: String, val goal: String, val keywords: String,
+    val intervalMin: Int, val lastChecked: Long?, val active: Boolean, val baselined: Boolean, val createdAt: Long,
+)
+
+/** A document or link found on a watched site. baseline = it was already there when watching began (never announced). */
+@Entity(tableName = "watch_items", indices = [Index(value = ["siteId", "url"], unique = true)])
+data class WatchItem(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0, val siteId: Long, val url: String, val title: String,
+    val subject: String?, val itemDate: String?, val summary: String?, val discoveredAt: Long, val notified: Boolean, val baseline: Boolean,
+)
+
+@Dao interface WatchDao {
+    @Insert suspend fun insertSite(s: WatchSite): Long
+    @Update suspend fun updateSite(s: WatchSite)
+    @Query("DELETE FROM watch_sites WHERE id = :id") suspend fun deleteSite(id: Long)
+    @Query("DELETE FROM watch_items WHERE siteId = :id") suspend fun deleteItemsOf(id: Long)
+    @Query("SELECT * FROM watch_sites ORDER BY id DESC") fun sites(): Flow<List<WatchSite>>
+    @Query("SELECT * FROM watch_sites WHERE active = 1") suspend fun activeSites(): List<WatchSite>
+    @Query("SELECT * FROM watch_sites ORDER BY id") suspend fun allSites(): List<WatchSite>
+    @Query("SELECT * FROM watch_sites WHERE id = :id") suspend fun siteById(id: Long): WatchSite?
+    @Query("SELECT * FROM watch_sites WHERE url = :url LIMIT 1") suspend fun siteByUrl(url: String): WatchSite?
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertItem(i: WatchItem): Long // -1 when the link is already known
+    @Query("SELECT url FROM watch_items WHERE siteId = :id") suspend fun knownUrls(id: Long): List<String>
+    @Query("SELECT * FROM watch_items WHERE baseline = 0 ORDER BY discoveredAt DESC LIMIT :n") fun recentItems(n: Int): Flow<List<WatchItem>>
+}
+
+/** Adds the watcher tables without touching chats, tasks, memories or the audit log. */
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS `watch_sites` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `url` TEXT NOT NULL, `name` TEXT NOT NULL, `goal` TEXT NOT NULL, `keywords` TEXT NOT NULL, `intervalMin` INTEGER NOT NULL, `lastChecked` INTEGER, `active` INTEGER NOT NULL, `baselined` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS `watch_items` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `siteId` INTEGER NOT NULL, `url` TEXT NOT NULL, `title` TEXT NOT NULL, `subject` TEXT, `itemDate` TEXT, `summary` TEXT, `discoveredAt` INTEGER NOT NULL, `notified` INTEGER NOT NULL, `baseline` INTEGER NOT NULL)")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_watch_items_siteId_url` ON `watch_items` (`siteId`, `url`)")
+    }
+}
+
+@Database(entities = [Conversation::class, Message::class, Memory::class, TaskItem::class, AuditLog::class, WatchSite::class, WatchItem::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun chat(): ChatDao
     abstract fun memory(): MemoryDao
     abstract fun tasks(): TaskDao
     abstract fun audit(): AuditDao
+    abstract fun watch(): WatchDao
 
     companion object {
         private const val NAME = "sahachor.db"
@@ -68,6 +109,7 @@ abstract class AppDatabase : RoomDatabase() {
                 System.loadLibrary("sqlcipher")
                 val db = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, NAME)
                     .openHelperFactory(SupportOpenHelperFactory(passphrase))
+                    .addMigrations(MIGRATION_1_2)
                     .build()
                 db.openHelper.writableDatabase // force open now so a wrong key fails here, not later in the UI
                 db

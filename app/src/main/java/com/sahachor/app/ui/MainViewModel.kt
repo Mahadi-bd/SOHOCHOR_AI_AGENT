@@ -12,6 +12,7 @@ import com.sahachor.app.data.*
 import com.sahachor.app.llm.*
 import com.sahachor.app.billing.BillingManager
 import com.sahachor.app.google.DriveExporter
+import com.sahachor.app.reminders.Notifier
 import com.sahachor.app.vault.VaultItem
 import com.sahachor.app.vault.VaultNames
 import com.sahachor.app.vault.VaultStore
@@ -26,6 +27,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.sahachor.app.watch.WatchEngine
+import com.sahachor.app.watch.WatchScheduler
 
 data class SetupUi(val busy: Boolean = false, val connected: Boolean = false, val errorMessage: String? = null, val errorFix: String? = null)
 data class ChatUi(
@@ -68,6 +71,12 @@ class MainViewModel(private val app: SahachorApp) : ViewModel() {
     val documents: StateFlow<List<DocItem>> = _documents
     private val _keyList = MutableStateFlow(app.router.providers())
     val keyList: StateFlow<List<ProviderConfig>> = _keyList
+    private val _watchSites = MutableStateFlow<List<WatchSite>>(emptyList())
+    val watchSites: StateFlow<List<WatchSite>> = _watchSites
+    private val _watchItems = MutableStateFlow<List<WatchItem>>(emptyList())
+    val watchItems: StateFlow<List<WatchItem>> = _watchItems
+    private val _watchMessage = MutableStateFlow<String?>(null)
+    val watchMessage: StateFlow<String?> = _watchMessage
     private val _vaultItems = MutableStateFlow<List<VaultItem>>(emptyList())
     val vaultItems: StateFlow<List<VaultItem>> = _vaultItems
     private val _vaultMessage = MutableStateFlow<String?>(null)
@@ -100,6 +109,8 @@ class MainViewModel(private val app: SahachorApp) : ViewModel() {
         coroutineScope {
             launch { d.tasks().all().collect { _tasks.value = it } }
             launch { d.memory().all().collect { _memories.value = it } }
+            launch { d.watch().sites().collect { _watchSites.value = it } }
+            launch { d.watch().recentItems(60).collect { _watchItems.value = it } }
             d.chat().messages(id).collect { list -> _chat.update { it.copy(messages = list) } }
         }
     }
@@ -110,6 +121,8 @@ class MainViewModel(private val app: SahachorApp) : ViewModel() {
             add(CreateDocumentTool(app.documents) { app.settings.docTheme.value.takeIf { it != "auto" } })
             add(ZipDocumentsTool(app.documents)); addAll(PhoneTools.all(app))
             if (d != null) addAll(listOf(
+                WatchAddTool(d.watch(), app), WatchListTool(d.watch()), WatchRemoveTool(d.watch()), WatchCheckNowTool(app),
+                SearchSiteTool(WatchEngine(app, d.watch(), app.router) { t, x, u, i -> Notifier.showWatch(app, i, t, x, u) }),
                 CreateReminderTool(d, app.scheduler), ListTasksTool(d), CompleteTaskTool(d, app.scheduler),
                 DeleteTaskTool(d, app.scheduler), RememberTool(d), RecallTool(d),
             ))
@@ -138,6 +151,31 @@ class MainViewModel(private val app: SahachorApp) : ViewModel() {
                 is SetupResult.Failure -> _setup.value = SetupUi(errorMessage = r.error.message, errorFix = r.error.fix)
             }
         }
+    }
+
+    // ---- Site watching ----
+    fun clearWatchMessage() { _watchMessage.value = null }
+
+    fun addWatch(url: String, goal: String, keywords: String, intervalMin: Int) {
+        val d = db ?: run { _watchMessage.value = "ডেটাবেস চালু নেই।"; return }
+        val u = UrlGuard.parse(url.trim()) ?: run { _watchMessage.value = "শুধু https:// দিয়ে শুরু হওয়া ঠিকানা চলে।"; return }
+        if (goal.isBlank()) { _watchMessage.value = "কী খুঁজবে তা লিখুন।"; return }
+        viewModelScope.launch {
+            if (d.watch().siteByUrl(u.toString()) != null) { _watchMessage.value = "এই সাইট আগেই যোগ করা আছে।"; return@launch }
+            d.watch().insertSite(WatchSite(url = u.toString(), name = u.host, goal = goal.trim().take(300), keywords = keywords.trim().take(300), intervalMin = intervalMin, lastChecked = null, active = true, baselined = false, createdAt = System.currentTimeMillis()))
+            WatchScheduler.runNow(app)
+            _watchMessage.value = "যোগ হয়েছে। প্রথম স্ক্যান ব্যাকগ্রাউন্ডে চলছে: এখন যা আছে চুপচাপ মনে রাখবে, নতুন এলে নোটিফিকেশন দেবে।"
+        }
+    }
+
+    fun removeWatch(id: Long) {
+        val d = db ?: return
+        viewModelScope.launch { d.watch().deleteItemsOf(id); d.watch().deleteSite(id) }
+    }
+
+    fun checkWatchNow() {
+        WatchScheduler.runNow(app, force = true)
+        _watchMessage.value = "সব সাইট এখনই চেক শুরু হয়েছে। নতুন কিছু পেলে নোটিফিকেশন আসবে।"
     }
 
     fun refreshKeys() { _keyList.value = app.router.providers() }

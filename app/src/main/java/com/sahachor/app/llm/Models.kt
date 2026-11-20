@@ -13,7 +13,8 @@ enum class ProviderType(
     ANTHROPIC("Claude (Anthropic)", "https://api.anthropic.com/v1", "https://console.anthropic.com/settings/keys", "পেইড"),
 }
 
-data class ChatMsg(val role: String, val content: String) // role: "user" | "assistant"
+/** role: "user" | "assistant". images: JPEG bytes sent with the message (vision-capable providers only). */
+data class ChatMsg(val role: String, val content: String, val images: List<ByteArray> = emptyList())
 
 /** alt: backup models for the same key, tried in order when the main one is slow, missing or overloaded. */
 data class ProviderConfig(val type: ProviderType, val apiKey: String, val model: String, val valid: Boolean = true, val alt: List<String> = emptyList())
