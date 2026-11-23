@@ -107,8 +107,29 @@ class AnthropicClient : LlmClient {
     }
 }
 
+/**
+ * GitHub Models: the models behind GitHub's AI offering (usable with a GitHub token that has the "models" permission).
+ * Chat uses the standard chat-completions format; only the model list lives at a separate catalog address.
+ * This provider is marked experimental because GitHub changes it often.
+ */
+class GitHubModelsClient : LlmClient {
+    override val type = ProviderType.GITHUB
+    private val chatClient = OpenAiCompatClient(ProviderType.GITHUB)
+
+    override suspend fun listModels(key: String): List<String> {
+        val headers = mapOf("Authorization" to "Bearer $key", "Accept" to "application/vnd.github+json", "X-GitHub-Api-Version" to "2022-11-28")
+        val text = Http.execute("https://models.github.ai/catalog/models", headers, null)
+        val arr = if (text.trimStart().startsWith("[")) JSONArray(text) else JSONObject(text).optJSONArray("data") ?: JSONArray()
+        return arr.mapObjects { it.optString("id").ifBlank { null } }
+    }
+
+    override suspend fun chat(key: String, model: String, system: String?, messages: List<ChatMsg>): String =
+        chatClient.chat(key, model, system, messages)
+}
+
 fun clientFor(type: ProviderType): LlmClient = when (type) {
     ProviderType.GEMINI -> GeminiClient()
     ProviderType.ANTHROPIC -> AnthropicClient()
+    ProviderType.GITHUB -> GitHubModelsClient()
     else -> OpenAiCompatClient(type)
 }

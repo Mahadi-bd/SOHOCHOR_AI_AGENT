@@ -205,6 +205,7 @@ class MainViewModel(private val app: SahachorApp) : ViewModel() {
     }
 
     fun stop() { sendJob?.cancel(); if (app.settings.speakReplies.value) app.speaker.stop() }
+    fun stopSpeaking() { app.speaker.stop() }
 
     fun send(text: String) {
         val clean = text.trim()
@@ -239,7 +240,7 @@ class MainViewModel(private val app: SahachorApp) : ViewModel() {
             is AgentStep.Reply -> {
                 record(Message(conversationId = cid ?: 0, role = "assistant", content = step.text, createdAt = System.currentTimeMillis()))
                 _chat.update { it.copy(sending = false, notice = null, hasProvider = app.router.hasProvider(), keys = keyCount()) }
-                if (app.settings.speakReplies.value) app.speaker.speak(SpeechText.forSpeaking(step.text))
+                if (app.settings.speakReplies.value) app.speaker.speak(step.text)
             }
             is AgentStep.Confirm -> _chat.update { it.copy(sending = false, pending = step.pending) }
             is AgentStep.Failed -> _chat.update { it.copy(sending = false, error = step.error, hasProvider = app.router.hasProvider(), keys = keyCount()) }

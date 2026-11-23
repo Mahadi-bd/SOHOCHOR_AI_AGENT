@@ -137,6 +137,10 @@ class DocsTest {
     @Test fun newCommandsExist() {
         assertTrue(CommandLibrary.expand("/legal আমি অনলাইনে খাবার বিক্রি করব")!!.contains("not legal advice"))
         assertTrue(CommandLibrary.expand("/presentation বিষয়")!!.contains("pptx"))
+        assertTrue(CommandLibrary.expand("/notice ফ্ল্যাট কমিটি")!!.contains("স্মারক নং"))
+        assertTrue(CommandLibrary.expand("/application ছুটি")!!.contains("বিনীত নিবেদন"))
+        assertTrue(CommandLibrary.expand("/letter বিল")!!.contains("সম্বোধন"))
+        assertTrue(CommandLibrary.expand("/order নিয়োগ")!!.contains("কর্তৃপক্ষের আদেশক্রমে"))
     }
 
     @Test fun odtIsValidOpenDocumentPackage() {

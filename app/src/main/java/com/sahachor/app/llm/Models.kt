@@ -11,6 +11,8 @@ enum class ProviderType(
     OPENROUTER("OpenRouter", "https://openrouter.ai/api/v1", "https://openrouter.ai/keys", "কিছু মডেল ফ্রি"),
     OPENAI("OpenAI", "https://api.openai.com/v1", "https://platform.openai.com/api-keys", "পেইড"),
     ANTHROPIC("Claude (Anthropic)", "https://api.anthropic.com/v1", "https://console.anthropic.com/settings/keys", "পেইড"),
+    DEEPSEEK("DeepSeek", "https://api.deepseek.com", "https://platform.deepseek.com/api_keys", "কম খরচ · পেইড"),
+    GITHUB("GitHub Models (Copilot-এর মডেল)", "https://models.github.ai/inference", "https://github.com/settings/personal-access-tokens/new", "GitHub টোকেন · ফ্রি সীমিত · পরীক্ষামূলক"),
 }
 
 /** role: "user" | "assistant". images: JPEG bytes sent with the message (vision-capable providers only). */

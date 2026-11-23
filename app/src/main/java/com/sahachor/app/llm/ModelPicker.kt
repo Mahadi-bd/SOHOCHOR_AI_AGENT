@@ -11,6 +11,8 @@ object ModelPicker {
         ProviderType.OPENAI -> listOf("gpt-4o-mini")
         ProviderType.ANTHROPIC -> listOf("claude-haiku-5-5")
         ProviderType.OPENROUTER -> emptyList()
+        ProviderType.DEEPSEEK -> listOf("deepseek-chat")
+        ProviderType.GITHUB -> listOf("openai/gpt-4o-mini", "openai/gpt-4.1-mini")
     }
 
     private val unstable = Regex("preview|exp|thinking", RegexOption.IGNORE_CASE)
@@ -42,6 +44,8 @@ object ModelPicker {
             ProviderType.GROQ -> models.firstOrNull { it == "llama-3.3-70b-versatile" } ?: models.firstOrNull { it == "llama-3.1-8b-instant" } ?: models.first()
             ProviderType.OPENROUTER -> models.firstOrNull { it.endsWith(":free") } ?: models.first()
             ProviderType.OPENAI -> models.firstOrNull { it == "gpt-4o-mini" } ?: newest(models.filter { it.startsWith("gpt-") }) ?: models.first()
+            ProviderType.DEEPSEEK -> models.firstOrNull { it == "deepseek-chat" } ?: models.first()
+            ProviderType.GITHUB -> models.firstOrNull { it == "openai/gpt-4o-mini" } ?: models.firstOrNull { it.startsWith("openai/") && "mini" in it } ?: models.first()
             ProviderType.ANTHROPIC -> newest(models.filter { "haiku" in it }) ?: newest(models.filter { "sonnet" in it }) ?: models.first()
         }
     }

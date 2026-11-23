@@ -100,10 +100,11 @@ fun ChatScreen(vm: MainViewModel, onAddKey: () -> Unit) {
     val listState = rememberLazyListState()
     val voiceCtx = LocalContext.current
     val voice = remember { VoiceInput(voiceCtx) }
-    DisposableEffect(Unit) { onDispose { voice.stop() } }
+    DisposableEffect(Unit) { onDispose { voice.cancel() } }
     var listening by remember { mutableStateOf(false) }
     var voiceNote by remember { mutableStateOf<String?>(null) }
     val voiceAuto by vm.settings.voiceAutoSend.collectAsState()
+    val speakOn by vm.settings.speakReplies.collectAsState()
     val voiceLang by vm.settings.voiceLang.collectAsState()
     fun startVoice() {
         voiceNote = null
@@ -142,6 +143,7 @@ fun ChatScreen(vm: MainViewModel, onAddKey: () -> Unit) {
                 Image(painterResource(R.drawable.life_easy_logo), contentDescription = null, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(if (state.hasProvider) "AI সংযুক্ত (${state.keys}টি কী) · /help" else "AI যুক্ত নেই", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                if (speakOn) TextButton(onClick = { vm.stopSpeaking() }) { Text("🔇") }
                 TextButton(onClick = onAddKey) { Text(if (state.hasProvider) "কী যোগ" else "কী যোগ করুন") }
             }
         }
@@ -171,7 +173,7 @@ fun ChatScreen(vm: MainViewModel, onAddKey: () -> Unit) {
                 }
             }
         }
-        if (listening) Text("🎤 শুনছি… বলুন (${if (voiceLang.startsWith("bn")) "বাংলা" else "English"})", Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall)
+        if (listening) Text("🎤 শুনছি… বলুন (${if (voiceLang.startsWith("bn")) "বাংলা" else "English"}) · শেষ হলে ⏹ চাপুন", Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall)
         voiceNote?.let { Text(it, Modifier.padding(horizontal = 12.dp), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(value = input, onValueChange = { input = it }, modifier = Modifier.weight(1f), placeholder = { Text("লিখুন বা 🎤 চেপে বলুন…") }, maxLines = 4)

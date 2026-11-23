@@ -20,7 +20,7 @@ internal object Formats {
 
 class CreateDocumentTool(private val store: DocumentStore, private val themeOverride: () -> String? = { null }) : Tool {
     override val name = "create_document"
-    override val help = "Create modern, styled files from ONE content. args: format or formats (list of pdf|docx|odt|xlsx|ods|csv|pptx), title, theme (blue|green|purple|orange|teal|red; pick one that suits the topic), zip (true to also bundle the created files into a ZIP). " +
+    override val help = "Create modern, styled files from ONE content. args: format or formats (list of pdf|docx|odt|xlsx|ods|csv|pptx), title, theme (blue|green|purple|orange|teal|red; pick one that suits the topic), register (cholit|sadhu|none: the Bengali style of the whole document, default cholit; never mix), zip (true to also bundle the created files into a ZIP). " +
         "pdf/docx/odt: sections=[{heading, body, bullets:[...], table:[[header,...],[cell,...]]}]. " +
         "xlsx/ods/csv: sheets=[{name, rows:[[header,...],[cell,...]]}] (first row is the header; cells starting with = are formulas; csv uses the sheet named in args.sheet or the first). " +
         "pptx: subtitle, slides=[{title, bullets:[short points, max 6]}] (a title slide is added automatically). " +
@@ -35,9 +35,19 @@ class CreateDocumentTool(private val store: DocumentStore, private val themeOver
         val logo = store.logo()
         val created = mutableListOf<String>()
         val problems = mutableListOf<String>()
-        val doc: DocSpec? by lazy { SpecParser.doc(args)?.copy(branded = branded) }
+        val register = args.optString("register").trim().lowercase().takeIf { it in setOf("cholit", "sadhu", "none") } ?: "cholit"
+        val langNotes = mutableListOf<String>()
+        val doc: DocSpec? by lazy {
+            SpecParser.doc(args)?.copy(branded = branded)?.let { s ->
+                if (register == "none") s else BengaliLang.polishDoc(s, register).let { (p, r) -> r.message(register)?.let { langNotes += it }; p }
+            }
+        }
         val sheets: SheetSpec? by lazy { SpecParser.sheets(args) }
-        val deck: DeckSpec? by lazy { SpecParser.deck(args)?.copy(branded = branded) }
+        val deck: DeckSpec? by lazy {
+            SpecParser.deck(args)?.copy(branded = branded)?.let { s ->
+                if (register == "none") s else BengaliLang.polishDeck(s, register).let { (p, r) -> r.message(register)?.let { langNotes += it }; p }
+            }
+        }
 
         for (fmt in formats) {
             try {
@@ -96,7 +106,8 @@ class CreateDocumentTool(private val store: DocumentStore, private val themeOver
             store.zip(base, created.toList())?.let { created += it.name }
         }
         if (created.isEmpty()) return@withContext ToolResult(false, problems.joinToString("; "))
-        val tail = if (problems.isEmpty()) "" else " Problems: ${problems.joinToString("; ")}."
+        val lang = if (langNotes.isEmpty()) "" else " ${langNotes.distinct().joinToString(" ")}"
+        val tail = (if (problems.isEmpty()) "" else " Problems: ${problems.joinToString("; ")}.") + lang
         ToolResult(true, "created ${created.joinToString()}.$tail Tell the user the files are in the ডকুমেন্ট tab, where they can open or share them.")
     }
 }

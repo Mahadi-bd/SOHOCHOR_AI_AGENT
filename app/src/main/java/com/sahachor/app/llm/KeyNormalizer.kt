@@ -21,7 +21,9 @@ object KeyNormalizer {
         key.startsWith("gsk_") -> listOf(ProviderType.GROQ)
         key.startsWith("sk-or-") -> listOf(ProviderType.OPENROUTER)
         key.startsWith("sk-ant-") -> listOf(ProviderType.ANTHROPIC)
-        key.startsWith("sk-") -> listOf(ProviderType.OPENAI)
+        key.startsWith("ghp_") || key.startsWith("github_pat_") || key.startsWith("gho_") || key.startsWith("ghu_") -> listOf(ProviderType.GITHUB)
+        key.startsWith("sk-proj-") -> listOf(ProviderType.OPENAI)
+        key.startsWith("sk-") -> if (key.length <= 40) listOf(ProviderType.DEEPSEEK, ProviderType.OPENAI) else listOf(ProviderType.OPENAI, ProviderType.DEEPSEEK) // DeepSeek keys are short (sk- + 32 hex)
         else -> ProviderType.values().toList()
     }
 }

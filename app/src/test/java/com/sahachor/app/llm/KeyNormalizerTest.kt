@@ -16,7 +16,10 @@ class KeyNormalizerTest {
         assertEquals(listOf(ProviderType.OPENROUTER), KeyNormalizer.candidates("sk-or-v1-x"))
         assertEquals(listOf(ProviderType.ANTHROPIC), KeyNormalizer.candidates("sk-ant-x"))
         assertEquals(listOf(ProviderType.OPENAI), KeyNormalizer.candidates("sk-proj-x"))
-        assertEquals(5, KeyNormalizer.candidates("unknownformatkey").size)
+        assertEquals(ProviderType.values().size, KeyNormalizer.candidates("unknownformatkey").size)
+        assertEquals(listOf(ProviderType.DEEPSEEK, ProviderType.OPENAI), KeyNormalizer.candidates("sk-" + "a1b2c3d4".repeat(4)))
+        assertEquals(listOf(ProviderType.GITHUB), KeyNormalizer.candidates("github_pat_11ABCDEFG0abcdefghijklmnop"))
+        assertEquals(listOf(ProviderType.GITHUB), KeyNormalizer.candidates("ghp_abcdefghijklmnopqrstuvwxyz0123456789"))
     }
     @Test fun rejectsGarbage() {
         assertFalse(KeyNormalizer.looksLikeKey("short"))

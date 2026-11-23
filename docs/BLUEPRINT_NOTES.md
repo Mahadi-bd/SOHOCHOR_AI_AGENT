@@ -25,6 +25,10 @@ Nothing here changes the blueprint modules; each item extends one of them.
 
 | Web Watcher: watch a website for new documents, read them with the user's own AI key (scanned Bengali PDFs through vision), notify; plus one-off site search | new module M14 | `watch/` package (`WatchEngine`, `WatchWorker`), agent tools `watch_add`, `watch_list`, `watch_remove`, `watch_check_now`, `search_site`. DB version 2 with a migration that keeps all existing data. https sites only; background checks at best every 15 minutes (Android WorkManager). |
 
+| More AI providers: DeepSeek and GitHub Models (the models behind GitHub Copilot's platform, via a GitHub token) | LLM router | `ProviderType.DEEPSEEK`, `ProviderType.GITHUB`; GitHub Models is marked experimental. There is no public API for the Copilot chat product itself, and Microsoft's own route is Azure OpenAI. |
+| Bengali language polish for generated documents (spelling, danda spacing, one style per document, mixed sadhu/cholit report) and office-letter commands `/notice`, `/application`, `/letter`, `/order` | M4 Document Studio | `BengaliLang`, ideas from the owner's Python Bengali office document agent. Word-boundary rules were rebuilt for Bengali; tone rewriting was left out on purpose. |
+| Voice listens continuously (restarts itself after pauses) and reads the whole answer aloud in chunks | M12 Voice | `VoiceInput`, `SpeechText.chunks`. |
+
 ## Planned UI/UX redesign (decided, not built yet)
 Direction from the owner: a Cyberpunk-inspired neon dark UI with glassmorphism and a glowing orb AI avatar, plus a Planet Earth `.glb` 3D model that the owner will supply. All current screens (`ui/` package) are temporary. When the redesign starts: put colours, shapes and glass effects in one theme layer first, then restyle screen by screen; the orb replaces the bird/cube in `ThinkingIndicator`; the `.glb` goes through a model viewer (three.js in a web view or a native renderer).
 
